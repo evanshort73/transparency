@@ -185,7 +185,7 @@ def getDensity(aSorted, halfLife):
     result *= k
     return result
 
-def denseMin(a, densityReward = 0.16, halfLife = 0.1):
+def denseMin(a, densityReward = 0.1, halfLife = 0.1):
     aSorted = np.sort(np.ravel(a))
     stairwayError = getStairwayError(aSorted)
     density = getDensity(aSorted, halfLife)
@@ -223,6 +223,7 @@ adjustedTransparentDiff = transparentDiff - opaqueDiff
 adjustedIm1, adjustedIm2 = getAdjustedImages(rgbScale, hubAxis,
                                              opaqueDiff, im1, im2)
 
+print "Transparent Difference Sign:", transparentDiffSign
 print "Opaque Difference:", opaqueDiff
 print "Transparent Difference:", transparentDiff
 
