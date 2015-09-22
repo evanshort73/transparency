@@ -243,48 +243,53 @@ def getAdjustedColorSpaceCenter(rgbScale, im1, im2, colorSpaceCenter):
 
 # TODO: Smooth the difference between the images before using it to find alpha
 def getIdealAlpha(hubAxis, adjustedTransparentDiff, adjustedIm1, adjustedIm2):
-    result = np.dot(adjustedIm2 - adjustedIm1, hubAxis)
-    result -= adjustedTransparentDiff
-    result /= -adjustedTransparentDiff
-    np.clip(result, 0, 1, out = result)
-    return result
-
-def getMinAlpha(adjustedIm1, adjustedIm2, adjustedColorSpaceCenter):
-    imMean = adjustedIm1 + adjustedIm2
-    imMean *= 0.5
-    # TODO: Enforce abs(perChannelCutoff) >= abs(imMean) to avoid zero division
-    perChannelCutoff = np.sign(imMean)
-    # TODO: Stop asserting against this perfectly normal occurence
-    assert np.all(perChannelCutoff != 0)
-    perChannelCutoff *= 0.5
-    perChannelCutoff += adjustedColorSpaceCenter
-    cutoffAlpha = imMean / perChannelCutoff
-    minAlpha = np.max(cutoffAlpha, axis = 2)
-    return minAlpha
-
-def getCompromiseAlpha(idealAlpha, minAlpha):
-    return np.maximum(idealAlpha, minAlpha)
+    idealAlpha = np.dot(adjustedIm2 - adjustedIm1, hubAxis)
+    idealAlpha -= adjustedTransparentDiff
+    idealAlpha /= -adjustedTransparentDiff
+    np.clip(idealAlpha, 0, 1, out = idealAlpha)
+    # Remove negative zero so that we don't get negative infinity from division
+    np.abs(idealAlpha, out = idealAlpha)
+    return idealAlpha
 
 idealAlpha = getIdealAlpha(hubAxis, adjustedTransparentDiff,
                            adjustedIm1, adjustedIm2)
 
 adjustedColorSpaceCenter = getAdjustedColorSpaceCenter(rgbScale, im1, im2,
                                                        colorSpaceCenter)
-minAlpha = getMinAlpha(adjustedIm1, adjustedIm2, adjustedColorSpaceCenter)
-
-compromiseAlpha = getCompromiseAlpha(idealAlpha, minAlpha)
 
 # Save transparent image
 
 def getTrueColors(adjustedIm1, adjustedIm2, adjustedColorSpaceCenter,
-                  compromiseAlpha):
-    trueColors = adjustedIm1 + adjustedIm2
-    trueColors *= 0.5
-    # TODO: Even though compromiseAlpha is guaranteed to be nonzero, it could
-    # still be very small. Make this more numerically stable.
-    trueColors /= compromiseAlpha[:, :, None]
+                  idealAlpha):
+    imMean = adjustedIm1 + adjustedIm2
+    imMean *= 0.5
+
+    oldSettings = np.seterr(divide = "ignore")
+    
+    colorMultiplier = np.reciprocal(idealAlpha)
+    
+    perChannelCutoff = np.sign(imMean)
+    perChannelCutoff *= 0.5
+    perChannelCutoff += adjustedColorSpaceCenter
+    perChannelCutoff /= imMean
+
+    np.seterr(**oldSettings)
+    
+    perChannelCutoff = np.min(perChannelCutoff, axis = 2)
+    colorMultiplier = np.minimum(colorMultiplier, perChannelCutoff, out = colorMultiplier)
+    # TODO: Test an example where this is necessary
+    colorMultiplier[np.all(imMean == 0, axis = 2)] = 1
+    assert np.all(np.isfinite(colorMultiplier))
+    # TODO: Test an example where this is necessary
+    np.maximum(colorMultiplier, 1, out = colorMultiplier)
+
+    trueColors = imMean
+    trueColors *= colorMultiplier[:, :, None]
     colorSpaceStart = adjustedColorSpaceCenter - 0.5
     trueColors -= colorSpaceStart
+    # Even though we never scale colors past the color space to compensate for
+    # alpha, some pixels move outside the color space during the initial color
+    # adjustment
     np.clip(trueColors, 0, 1, out = trueColors)
     return trueColors
 
@@ -296,7 +301,7 @@ def getTransparentImage(trueColors, alpha):
     return transparentImage
 
 trueColors = getTrueColors(adjustedIm1, adjustedIm2, adjustedColorSpaceCenter,
-                           compromiseAlpha)
+                           idealAlpha)
 transparentImage = getTransparentImage(trueColors, idealAlpha)
 
 imsave("idealAlpha.png", idealAlpha)
