@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.misc import imread, imsave
 #from matplotlib import pyplot as plt
-from ellipseDistance import closestEllipsePoint
+from parallelogramDistance import closestParallelogramPoint
 from checkerboard import checkerboard
 from imageNormalization import imageNormalize
 
@@ -14,10 +14,7 @@ def loadNormalizedImage(filename):
     return im, imMean
 
 def initRgbScale(im1, im2):
-    rgbScale = np.vstack((np.var(im1, axis = (0, 1)),
-                          np.var(im2, axis = (0, 1))))
-    rgbScale /= np.sum(rgbScale, axis = 0)
-    np.sqrt(rgbScale, out = rgbScale)
+    rgbScale = np.ones((2, 3))
     return rgbScale
 
 def initHubAxis(mean1, mean2):
@@ -82,12 +79,16 @@ def getObjectiveMatrix(outerMatrix, hubAxis):
 def scaleUpdate(i, rgbScale, hubAxis, outerMatrix):
     objectiveMatrix = getObjectiveMatrix(outerMatrix, hubAxis)
     sqrtMatrix = np.linalg.cholesky(objectiveMatrix)
-    
+
     ellipseMatrix = sqrtMatrix[i::3].T
     goalPoint = np.dot(ellipseMatrix, rgbScale[:, i]) \
                 - np.dot(np.ravel(rgbScale), sqrtMatrix)
-    scale = closestEllipsePoint(ellipseMatrix, goalPoint)
-    return scale
+    a, b = closestParallelogramPoint(
+        ellipseMatrix[:, 0] * (2 * rgbScale[0, i] / np.product(rgbScale[0])),
+        ellipseMatrix[:, 1] * (2 * rgbScale[1, i] / np.product(rgbScale[1])),
+        goalPoint)
+    return np.asarray([a * (2 * rgbScale[0, i] / np.product(rgbScale[0])),
+                       b * (2 * rgbScale[1, i] / np.product(rgbScale[1]))])
 
 def hubAxisUpdate(rgbScale, outerMatrix):
     rgbScaleDiag = np.vstack((np.diag(rgbScale[0]), np.diag(rgbScale[1])))
@@ -107,7 +108,7 @@ def objectiveUpdate(rgbScale, hubAxis, outerMatrix):
 oldObjective = np.inf
 tolerance = 0.0000000001
 objectiveHistory = []
-for i in xrange(50):
+for i in xrange(500):
     hubAxis = hubAxisUpdate(rgbScale, outerMatrix)
     objective = objectiveUpdate(rgbScale, hubAxis, outerMatrix)
     assert objective < oldObjective + tolerance
