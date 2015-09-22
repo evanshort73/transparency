@@ -57,6 +57,7 @@ def saveComparison(filename, rgbScale, hubAxis, opaqueDiff, im1, im2):
 
 im1, mean1 = loadNormalizedImage("in1.png")
 im2, mean2 = loadNormalizedImage("in2.png")
+colorSpaceCenter = -((mean1 + mean2) * 0.5 - 0.5)
 
 rgbScale = initRgbScale(im1, im2)
 
@@ -232,21 +233,13 @@ saveComparison("afterColorAdjustment.png", rgbScale, hubAxis, opaqueDiff,
 
 # Calculate alpha values
 
-def getAdjustedColorSpaceBounds(rgbScale, im1, im2, mean1, mean2):
+def getAdjustedColorSpaceCenter(rgbScale, im1, im2, colorSpaceCenter):
     originalRgbScale = initRgbScale(im1, im2)
     overallRgbScale = rgbScale / originalRgbScale
-    
-    totalColorVolume = np.sum(np.product(overallRgbScale, axis = 1))
-    cubeSideLength = np.power(0.5 * totalColorVolume,
-                              1 / float(overallRgbScale.shape[1]))
-    
-    scaledMean1 = mean1 * overallRgbScale[0]
-    scaledMean2 = mean2 * overallRgbScale[1]
-    scaledMeanMean = 0.5 * (scaledMean1 + scaledMean2)
 
-    colorSpaceStart = -scaledMeanMean
-    colorSpaceStop = cubeSideLength - scaledMeanMean
-    return colorSpaceStart, colorSpaceStop
+    adjustedColorSpaceCenter = colorSpaceCenter * np.mean(overallRgbScale,
+                                                          axis = 0)
+    return adjustedColorSpaceCenter
 
 # TODO: Smooth the difference between the images before using it to find alpha
 def getIdealAlpha(hubAxis, adjustedTransparentDiff, adjustedIm1, adjustedIm2):
@@ -256,16 +249,17 @@ def getIdealAlpha(hubAxis, adjustedTransparentDiff, adjustedIm1, adjustedIm2):
     np.clip(result, 0, 1, out = result)
     return result
 
-def getMinAlpha(adjustedIm1, adjustedIm2, colorSpaceStart, colorSpaceStop):
-    assert np.all(np.sign(colorSpaceStop) == -np.sign(colorSpaceStart))
+def getMinAlpha(adjustedIm1, adjustedIm2, adjustedColorSpaceCenter):
     imMean = adjustedIm1 + adjustedIm2
     imMean *= 0.5
-    # TODO: What if the origin is on the edge or outside of the color space?
-    startAlpha = imMean / colorSpaceStart
-    stopAlpha = imMean / colorSpaceStop
-    edgeAlpha = imMean
-    np.maximum(startAlpha, stopAlpha, out = edgeAlpha) # Remove negatives
-    minAlpha = np.max(edgeAlpha, axis = 2)
+    # TODO: Enforce abs(perChannelCutoff) >= abs(imMean) to avoid zero division
+    perChannelCutoff = np.sign(imMean)
+    # TODO: Stop asserting against this perfectly normal occurence
+    assert np.all(perChannelCutoff != 0)
+    perChannelCutoff *= 0.5
+    perChannelCutoff += adjustedColorSpaceCenter
+    cutoffAlpha = imMean / perChannelCutoff
+    minAlpha = np.max(cutoffAlpha, axis = 2)
     return minAlpha
 
 def getCompromiseAlpha(idealAlpha, minAlpha):
@@ -274,24 +268,23 @@ def getCompromiseAlpha(idealAlpha, minAlpha):
 idealAlpha = getIdealAlpha(hubAxis, adjustedTransparentDiff,
                            adjustedIm1, adjustedIm2)
 
-colorSpaceStart, colorSpaceStop = getAdjustedColorSpaceBounds(
-    rgbScale, im1, im2, mean1, mean2)
-minAlpha = getMinAlpha(adjustedIm1, adjustedIm2,
-                       colorSpaceStart, colorSpaceStop)
+adjustedColorSpaceCenter = getAdjustedColorSpaceCenter(rgbScale, im1, im2,
+                                                       colorSpaceCenter)
+minAlpha = getMinAlpha(adjustedIm1, adjustedIm2, adjustedColorSpaceCenter)
 
 compromiseAlpha = getCompromiseAlpha(idealAlpha, minAlpha)
 
 # Save transparent image
 
-def getTrueColors(adjustedIm1, adjustedIm2, colorSpaceStart, colorSpaceStop,
+def getTrueColors(adjustedIm1, adjustedIm2, adjustedColorSpaceCenter,
                   compromiseAlpha):
     trueColors = adjustedIm1 + adjustedIm2
     trueColors *= 0.5
     # TODO: Even though compromiseAlpha is guaranteed to be nonzero, it could
     # still be very small. Make this more numerically stable.
     trueColors /= compromiseAlpha[:, :, None]
+    colorSpaceStart = adjustedColorSpaceCenter - 0.5
     trueColors -= colorSpaceStart
-    trueColors /= colorSpaceStop - colorSpaceStart
     np.clip(trueColors, 0, 1, out = trueColors)
     return trueColors
 
@@ -302,8 +295,8 @@ def getTransparentImage(trueColors, alpha):
                                       axis = 2)
     return transparentImage
 
-trueColors = getTrueColors(adjustedIm1, adjustedIm2, colorSpaceStart,
-                           colorSpaceStop, compromiseAlpha)
+trueColors = getTrueColors(adjustedIm1, adjustedIm2, adjustedColorSpaceCenter,
+                           compromiseAlpha)
 transparentImage = getTransparentImage(trueColors, idealAlpha)
 
 imsave("idealAlpha.png", idealAlpha)
