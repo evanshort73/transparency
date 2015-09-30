@@ -3,5 +3,5 @@ RGB Scale: [[ 0.87686271  0.89549091  0.86719321]
 Hub Axis: [-0.57938423 -0.62257897 -0.5260317 ]
 Flat Error: 506.479932488
 Transparent Difference Sign: 1.0
-Opaque Difference: -0.379931010214
-Transparent Difference: 0.318326379237
+Opaque Difference: -0.379931010215
+Transparent Difference: 0.318326379236
