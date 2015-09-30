@@ -77,7 +77,7 @@ hubAxis, opaqueDiff = initHubAxis(im1, im2)
 
 outerMatrix = initOuterMatrix(im1, im2)
 
-# Optimize rgbScale and hubAxis
+# Adjust colors
 
 def getObjectiveMatrix(outerMatrix, hubAxis):
     rainMatrix = np.diag(np.diag(outerMatrix)) \
@@ -165,7 +165,7 @@ scaledIm2 = im2
 imsave("afterColorScaling.png",
        np.round(checkerboard(scaledIm1, scaledIm2) * 255).astype(np.uint8))
 
-# Optimize opaqueDiff and transparentDiff
+# Calculate transparency
 
 def getTransparentDiffSign(hubAxis, scaledIm1, scaledIm2):
     bgDiff = np.dot(scaledIm2 - scaledIm1, hubAxis)
@@ -254,8 +254,6 @@ opaqueDiff = getOpaqueDiff(hubAxis, scaledIm1, scaledIm2, transparentDiffSign)
 # TODO: Stop assuming transparentDiff is constant throughout the image
 transparentDiff = getTransparentDiff(hubAxis, scaledIm1, scaledIm2,
                                      transparentDiffSign)
-# TODO: Stop assuming the hub passes through the origin
-adjustedTransparentDiff = transparentDiff - opaqueDiff
 
 idealAlpha = getIdealAlpha(hubAxis, scaledIm1, scaledIm2,
                            opaqueDiff, transparentDiff)
@@ -272,7 +270,7 @@ adjustedIm2 = scaledIm2
 imsave("afterColorAdjustment.png",
        np.round(checkerboard(adjustedIm1, adjustedIm2) * 255).astype(np.uint8))
 
-# Save transparent image
+# Calculate true colors
 
 def getTrueColors(adjustedIm1, adjustedIm2, hubCenter, idealAlpha,
                   adjustmentToMatchPreviousCommit):
@@ -316,6 +314,7 @@ def getTransparentImage(trueColors, alpha):
                                       axis = 2)
     return transparentImage
 
+# TODO: Stop assuming the hub passes through the mean of the images
 hubCenter = 0.5 * (np.mean(adjustedIm1, axis = (0, 1)) \
                    + np.mean(adjustedIm2, axis = (0, 1)))
 
