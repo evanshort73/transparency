@@ -46,15 +46,6 @@ def getScaledImages(rgbScale, im1, im2):
     scaledIm2 = im2 * overallRgbScale[1]
     return scaledIm1, scaledIm2
 
-def getAdjustedImages(hubAxis, opaqueDiff, scaledIm1, scaledIm2):
-    oldMeanDiff = np.mean(scaledIm2, axis = (0, 1)) \
-                  - np.mean(scaledIm1, axis = (0, 1))
-    newMeanDiff = hubAxis * -opaqueDiff
-    adjustment = 0.5 * (newMeanDiff - oldMeanDiff)
-    adjustedIm1 = scaledIm1 - adjustment
-    adjustedIm2 = scaledIm2 + adjustment
-    return adjustedIm1, adjustedIm2
-
 im1 = imread("in1.png").astype(float) / 255
 im2 = imread("in2.png").astype(float) / 255
 
@@ -141,22 +132,23 @@ print "RGB Scale:", rgbScale
 print "Hub Axis:", hubAxis
 print "Flat Error:", objective
 
-im1, im2 = getScaledImages(rgbScale, im1, im2)
-scaledIm1 = im1
-scaledIm2 = im2
+scaledIm1, scaledIm2 = getScaledImages(rgbScale, im1, im2)
+del im1, im2
 
 imsave("afterColorScaling.png",
        np.round(checkerboard(scaledIm1, scaledIm2) * 255).astype(np.uint8))
 
+imMean = scaledIm1 + scaledIm2
+imMean *= 0.5
+bgDiff = np.dot(scaledIm2 - scaledIm1, hubAxis)
+bgDiff -= np.mean(bgDiff)
+del scaledIm1, scaledIm2
+
 # Calculate transparency
 
-def getTransparentDiffSign(hubAxis, scaledIm1, scaledIm2):
-    bgDiff = np.dot(scaledIm2 - scaledIm1, hubAxis)
-    bgDiff -= np.mean(bgDiff)
-    imMean = scaledIm1 + scaledIm2
-    imMean *= 0.5
-    imMean -= np.mean(imMean, axis = (0, 1))
-    hubDistance = np.linalg.norm(imMean, axis = 2)
+def getTransparentDiffSign(imMean, bgDiff):
+    centeredImMean = imMean - np.mean(imMean, axis = (0, 1))
+    hubDistance = np.linalg.norm(centeredImMean, axis = 2)
     hubDistance -= np.mean(hubDistance)
     covariance = np.mean(bgDiff * hubDistance)
     #bgDiffOrder = np.argsort(np.ravel(bgDiff))
@@ -203,84 +195,66 @@ def denseMin(a, densityReward = 0.1, halfLife = 0.1):
     #plt.show()
     return aSorted[np.argmax(density)]
 
-def getOpaqueDiff(hubAxis, scaledIm1, scaledIm2, transparentDiffSign):
-    bgDiff = np.dot(scaledIm2 - scaledIm1, hubAxis)
-    bgDiff -= np.mean(bgDiff)
-    bgDiff *= transparentDiffSign
-    opaqueDiff = denseMin(bgDiff) * transparentDiffSign
+def getOpaqueDiff(bgDiff, transparentDiffSign):
+    opaqueDiff = denseMin(bgDiff * transparentDiffSign) * transparentDiffSign
     return opaqueDiff
 
-def getTransparentDiff(hubAxis, scaledIm1, scaledIm2, transparentDiffSign):
-    bgDiff = np.dot(scaledIm2 - scaledIm1, hubAxis)
-    bgDiff -= np.mean(bgDiff)
+def getTransparentDiff(bgDiff, transparentDiffSign):
     # If transparent diff is positive, find max instead of min
-    bgDiff *= -transparentDiffSign
-    transparentDiff = denseMin(bgDiff) * -transparentDiffSign
+    transparentDiff = denseMin(bgDiff * -transparentDiffSign) \
+                      * -transparentDiffSign
     return transparentDiff
 
 # TODO: Smooth the difference between the images before using it to find alpha
-def getIdealAlpha(hubAxis, scaledIm1, scaledIm2, opaqueDiff, transparentDiff):
-    bgDiff = np.dot(scaledIm2 - scaledIm1, hubAxis)
-    bgDiff -= np.mean(bgDiff)
-    idealAlpha = bgDiff
-    idealAlpha -= transparentDiff
+def getIdealAlpha(bgDiff, opaqueDiff, transparentDiff):
+    idealAlpha = bgDiff - transparentDiff
     idealAlpha /= opaqueDiff - transparentDiff
     np.clip(idealAlpha, 0, 1, out = idealAlpha)
     # Remove negative zero so that we don't get negative infinity from division
     np.abs(idealAlpha, out = idealAlpha)
     return idealAlpha
 
-transparentDiffSign = getTransparentDiffSign(hubAxis, scaledIm1, scaledIm2)
+transparentDiffSign = getTransparentDiffSign(imMean, bgDiff)
 # TODO: Consider weighting the pixels by flattened error when calculating
 # opaqueDiff and transparentDiff
-opaqueDiff = getOpaqueDiff(hubAxis, scaledIm1, scaledIm2, transparentDiffSign)
+opaqueDiff = getOpaqueDiff(bgDiff, transparentDiffSign)
 # TODO: Stop assuming transparentDiff is constant throughout the image
-transparentDiff = getTransparentDiff(hubAxis, scaledIm1, scaledIm2,
-                                     transparentDiffSign)
+transparentDiff = getTransparentDiff(bgDiff, transparentDiffSign)
 
-idealAlpha = getIdealAlpha(hubAxis, scaledIm1, scaledIm2,
-                           opaqueDiff, transparentDiff)
+idealAlpha = getIdealAlpha(bgDiff, opaqueDiff, transparentDiff)
+del bgDiff
 
 print "Transparent Difference Sign:", transparentDiffSign
 print "Opaque Difference:", opaqueDiff
 print "Transparent Difference:", transparentDiff
 
-scaledIm1, scaledIm2 = getAdjustedImages(hubAxis, opaqueDiff,
-                                         scaledIm1, scaledIm2)
-adjustedIm1 = scaledIm1
-adjustedIm2 = scaledIm2
-
-imsave("afterColorAdjustment.png",
-       np.round(checkerboard(adjustedIm1, adjustedIm2) * 255).astype(np.uint8))
-
 # Calculate true colors
 
-def getTrueColors(adjustedIm1, adjustedIm2, hubCenter, idealAlpha):
-    imMean = adjustedIm1 + adjustedIm2
-    imMean *= 0.5
-    imMean -= hubCenter
+def getTrueColors(imMean, hubCenter, idealAlpha):
+    centeredImMean = imMean - hubCenter
 
     oldSettings = np.seterr(divide = "ignore")
     
     colorMultiplier = np.reciprocal(idealAlpha)
     
-    perChannelCutoff = np.sign(imMean)
+    perChannelCutoff = np.sign(centeredImMean)
     perChannelCutoff += 1
     perChannelCutoff *= 0.5
     perChannelCutoff -= hubCenter
-    perChannelCutoff /= imMean
+    perChannelCutoff /= centeredImMean
 
     np.seterr(**oldSettings)
     
     perChannelCutoff = np.min(perChannelCutoff, axis = 2)
-    colorMultiplier = np.minimum(colorMultiplier, perChannelCutoff, out = colorMultiplier)
+    colorMultiplier = np.minimum(colorMultiplier, perChannelCutoff,
+                                 out = colorMultiplier)
     # TODO: Test an example where this is necessary
-    colorMultiplier[np.all(imMean == 0, axis = 2)] = 1
+    colorMultiplier[np.all(centeredImMean == 0, axis = 2)] = 1
     assert np.all(np.isfinite(colorMultiplier))
     # TODO: Test an example where this is necessary
     np.maximum(colorMultiplier, 1, out = colorMultiplier)
 
-    trueColors = imMean
+    trueColors = centeredImMean
     trueColors *= colorMultiplier[:, :, None]
     trueColors += hubCenter
     # Even though we never scale colors past the color space to compensate for
@@ -297,11 +271,9 @@ def getTransparentImage(trueColors, alpha):
     return transparentImage
 
 # TODO: Stop assuming the hub passes through the mean of the images
-hubCenter = 0.5 * (np.mean(adjustedIm1, axis = (0, 1)) \
-                   + np.mean(adjustedIm2, axis = (0, 1)))
+hubCenter = np.mean(imMean, axis = (0, 1))
 
-trueColors = getTrueColors(adjustedIm1, adjustedIm2, hubCenter,
-                           idealAlpha)
+trueColors = getTrueColors(imMean, hubCenter, idealAlpha)
 transparentImage = getTransparentImage(trueColors, idealAlpha)
 
 imsave("idealAlpha.png", idealAlpha)
