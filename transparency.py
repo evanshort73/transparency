@@ -1,50 +1,10 @@
 import numpy as np
 from scipy.misc import imread, imsave
 #from matplotlib import pyplot as plt
-from ellipseDistance import closestEllipsePoint
+from rgbScale import getRgbScaleAndHubAxis, initRgbScale
 from checkerboard import checkerboard
 
 # Setup
-
-def initRgbScale(im1, im2):
-    rgbScale = np.vstack((np.var(im1, axis = (0, 1)),
-                          np.var(im2, axis = (0, 1))))
-    rgbScale /= np.sum(rgbScale, axis = 0)
-    np.sqrt(rgbScale, out = rgbScale)
-    return rgbScale
-
-def initHubAxis(im1, im2):
-    meanDiff = np.mean(im2, axis = (0, 1)) - np.mean(im1, axis = (0, 1))
-    hubAxisDiff = np.linalg.norm(meanDiff)
-    hubAxis = meanDiff / hubAxisDiff
-    opaqueDiff = -hubAxisDiff
-    return hubAxis, opaqueDiff
-
-def initOuterMatrix(im1, im2):
-    centeredIm1 = im1 - np.mean(im1, axis = (0, 1))
-    centeredIm2 = im2 - np.mean(im2, axis = (0, 1))
-    
-    originalRgbScale = initRgbScale(im1, im2)
-    scale1 = 1 / originalRgbScale[0]
-    scale2 = 1 / originalRgbScale[1]
-    
-    xxT = scale1[:, None] * np.einsum("ijk,ijl", centeredIm1, centeredIm1) \
-          * scale1
-    xyT = scale1[:, None] * np.einsum("ijk,ijl", centeredIm1, centeredIm2) \
-          * scale2
-    yyT = scale2[:, None] * np.einsum("ijk,ijl", centeredIm2, centeredIm2) \
-          * scale2
-    
-    outerMatrix = np.vstack((np.hstack((xxT, -xyT)),
-                             np.hstack((-xyT.T, yyT))))
-    return outerMatrix
-
-def getScaledImages(rgbScale, im1, im2):
-    originalRgbScale = initRgbScale(im1, im2)
-    overallRgbScale = rgbScale / originalRgbScale
-    scaledIm1 = im1 * overallRgbScale[0]
-    scaledIm2 = im2 * overallRgbScale[1]
-    return scaledIm1, scaledIm2
 
 im1 = imread("in1.png").astype(float) / 255
 im2 = imread("in2.png").astype(float) / 255
@@ -52,88 +12,22 @@ im2 = imread("in2.png").astype(float) / 255
 imsave("beforeColorAdjustment.png",
        np.round(checkerboard(im1, im2) * 255).astype(np.uint8))
 
-rgbScale = initRgbScale(im1, im2)
-
-# opaqueDiff is the typical value of [(im2 - im1) dot hubAxis] in opaque areas
-hubAxis, opaqueDiff = initHubAxis(im1, im2)
-
-outerMatrix = initOuterMatrix(im1, im2)
-
 # Adjust colors
 
-def getObjectiveMatrix(outerMatrix, hubAxis):
-    rainMatrix = np.diag(np.diag(outerMatrix)) \
-                 + np.diag(np.diag(outerMatrix, k = -3), k = -3) \
-                 + np.diag(np.diag(outerMatrix, k = 3), k = 3)
-    axisTwice = np.tile(hubAxis, 2)
-    objectiveMatrix = rainMatrix \
-                      - axisTwice[:, None] * outerMatrix * axisTwice
-    return objectiveMatrix
-
-def scaleUpdate(i, rgbScale, hubAxis, outerMatrix):
-    objectiveMatrix = getObjectiveMatrix(outerMatrix, hubAxis)
-    sqrtMatrix = np.linalg.cholesky(objectiveMatrix)
-    
-    ellipseMatrix = sqrtMatrix[i::3].T
-    goalPoint = np.dot(ellipseMatrix, rgbScale[:, i]) \
-                - np.dot(np.ravel(rgbScale), sqrtMatrix)
-    scale = closestEllipsePoint(ellipseMatrix, goalPoint)
-    return scale
-
-def hubAxisUpdate(rgbScale, outerMatrix):
-    rgbScaleDiag = np.vstack((np.diag(rgbScale[0]), np.diag(rgbScale[1])))
-    eigMatrix = np.dot(rgbScaleDiag.T, np.dot(outerMatrix, rgbScaleDiag))
-    eigVals, eigVecs = np.linalg.eig(eigMatrix)
-    
-    eigIndex = np.argmax(eigVals)
-    hubAxis = eigVecs[:, eigIndex]
-    return hubAxis
-
-def objectiveUpdate(rgbScale, hubAxis, outerMatrix):
-    objectiveMatrix = getObjectiveMatrix(outerMatrix, hubAxis)
-    objective = np.dot(np.ravel(rgbScale),
-                       np.dot(objectiveMatrix, np.ravel(rgbScale)))
-    return objective
-
-oldObjective = np.inf
-tolerance = 0.0000000001
-objectiveHistory = []
-for i in xrange(50):
-    hubAxis = hubAxisUpdate(rgbScale, outerMatrix)
-    objective = objectiveUpdate(rgbScale, hubAxis, outerMatrix)
-    assert objective < oldObjective + tolerance
-    objectiveHistory.append(objective)
-    oldObjective = objective
-
-    rgbScale[:, 0] = scaleUpdate(0, rgbScale, hubAxis, outerMatrix)
-    objective = objectiveUpdate(rgbScale, hubAxis, outerMatrix)
-    assert objective < oldObjective + tolerance
-    objectiveHistory.append(objective)
-    oldObjective = objective
-    
-    rgbScale[:, 1] = scaleUpdate(1, rgbScale, hubAxis, outerMatrix)
-    objective = objectiveUpdate(rgbScale, hubAxis, outerMatrix)
-    assert objective < oldObjective + tolerance
-    objectiveHistory.append(objective)
-    oldObjective = objective
-    
-    rgbScale[:, 2] = scaleUpdate(2, rgbScale, hubAxis, outerMatrix)
-    objective = objectiveUpdate(rgbScale, hubAxis, outerMatrix)
-    assert objective < oldObjective + tolerance
-    objectiveHistory.append(objective)
-    oldObjective = objective
+rgbScale, hubAxis, objective, objectiveHistory = getRgbScaleAndHubAxis(im1,
+                                                                       im2)
 
 #plt.plot(objectiveHistory)
 #plt.show()
 
-# TODO: Encapsulate the calculation of rgbScale into a function that returns
-# values corresponding to the original images instead of pre-equalized images
-print "RGB Scale:", rgbScale
+print "RGB Scale:", rgbScale * initRgbScale(im1, im2)
 print "Hub Axis:", hubAxis
 print "Flat Error:", objective
 
-scaledIm1, scaledIm2 = getScaledImages(rgbScale, im1, im2)
-del im1, im2
+scaledIm1 = im1 * rgbScale[0]
+del im1
+scaledIm2 = im2 * rgbScale[1]
+del im2
 
 imsave("afterColorScaling.png",
        np.round(checkerboard(scaledIm1, scaledIm2) * 255).astype(np.uint8))
