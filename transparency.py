@@ -146,16 +146,6 @@ del scaledIm1, scaledIm2
 
 # Calculate transparency
 
-def getTransparentDiffSign(imMean, bgDiff):
-    centeredImMean = imMean - np.mean(imMean, axis = (0, 1))
-    hubDistance = np.linalg.norm(centeredImMean, axis = 2)
-    hubDistance -= np.mean(hubDistance)
-    covariance = np.mean(bgDiff * hubDistance)
-    #bgDiffOrder = np.argsort(np.ravel(bgDiff))
-    #plt.plot(np.ravel(bgDiff)[bgDiffOrder], np.ravel(hubDistance)[bgDiffOrder])
-    #plt.show()
-    return -np.sign(covariance)
-
 def getStairwayError(aSorted):
     stairways = np.cumsum(aSorted)
     walls = aSorted * np.arange(len(aSorted))
@@ -195,15 +185,34 @@ def denseMin(a, densityReward = 0.1, halfLife = 0.1):
     #plt.show()
     return aSorted[np.argmax(density)]
 
-def getOpaqueDiff(bgDiff, transparentDiffSign):
-    opaqueDiff = denseMin(bgDiff * transparentDiffSign) * transparentDiffSign
-    return opaqueDiff
+def getCutoffDiff(bgDiff, direction):
+    cutoffDiff = denseMin(bgDiff * -direction) * -direction
+    return cutoffDiff
 
-def getTransparentDiff(bgDiff, transparentDiffSign):
-    # If transparent diff is positive, find max instead of min
-    transparentDiff = denseMin(bgDiff * -transparentDiffSign) \
-                      * -transparentDiffSign
-    return transparentDiff
+def getMountainWeights(bgDiff, mountainCenter, halfLife = 0.1):
+    mountainWeights = bgDiff - mountainCenter
+    
+    k = np.log(2) / halfLife
+    mountainWeights *= k
+    
+    np.abs(mountainWeights, out = mountainWeights)
+    np.negative(mountainWeights, out = mountainWeights)
+    np.exp(mountainWeights, out = mountainWeights)
+    return mountainWeights
+
+def getHubCenter(imMean, weights):
+    weightedImMean = imMean * weights[:, :, None]
+    hubCenter = np.sum(weightedImMean, axis=(0, 1)) / np.sum(weights)
+    return hubCenter
+
+def getHubCenterCost(imMean, hubCenter, weights):
+    centeredImMean = imMean - hubCenter
+    np.square(centeredImMean, out = centeredImMean)
+    centeredImMeanNormSquared = np.sum(centeredImMean, axis = 2)
+    del centeredImMean
+    centeredImMeanNormSquared *= weights
+    hubCenterCost = np.sum(centeredImMeanNormSquared) / np.sum(weights)
+    return hubCenterCost
 
 # TODO: Smooth the difference between the images before using it to find alpha
 def getIdealAlpha(bgDiff, opaqueDiff, transparentDiff):
@@ -214,19 +223,45 @@ def getIdealAlpha(bgDiff, opaqueDiff, transparentDiff):
     np.abs(idealAlpha, out = idealAlpha)
     return idealAlpha
 
-transparentDiffSign = getTransparentDiffSign(imMean, bgDiff)
 # TODO: Consider weighting the pixels by flattened error when calculating
 # opaqueDiff and transparentDiff
-opaqueDiff = getOpaqueDiff(bgDiff, transparentDiffSign)
 # TODO: Stop assuming transparentDiff is constant throughout the image
-transparentDiff = getTransparentDiff(bgDiff, transparentDiffSign)
+minDiff = getCutoffDiff(bgDiff, -1)
+maxDiff = getCutoffDiff(bgDiff, 1)
+transparentMinWeights = getMountainWeights(bgDiff, minDiff)
+transparentMinHubCenter = getHubCenter(imMean, transparentMinWeights)
+transparentMinCost = getHubCenterCost(imMean, transparentMinHubCenter,
+                                      transparentMinWeights)
+del transparentMinWeights
+transparentMaxWeights = getMountainWeights(bgDiff, maxDiff)
+transparentMaxHubCenter = getHubCenter(imMean, transparentMaxWeights)
+transparentMaxCost = getHubCenterCost(imMean, transparentMaxHubCenter,
+                                      transparentMaxWeights)
+del transparentMaxWeights
+if transparentMinCost <= transparentMaxCost:
+    transparentDiff = minDiff
+    opaqueDiff = maxDiff
+    hubCenter = transparentMinHubCenter
+else:
+    transparentDiff = maxDiff
+    opaqueDiff = minDiff
+    hubCenter = transparentMaxHubCenter
 
 idealAlpha = getIdealAlpha(bgDiff, opaqueDiff, transparentDiff)
 del bgDiff
 
-print "Transparent Difference Sign:", transparentDiffSign
-print "Opaque Difference:", opaqueDiff
+print "Transparent Min:"
+print "    Hub Center:", transparentMinHubCenter
+print "    Cost:", transparentMinCost
+print "Transparent Max:"
+print "    Hub Center:", transparentMaxHubCenter
+print "    Cost:", transparentMaxCost
+if transparentMinCost <= transparentMaxCost:
+    print "Choosing min diff to be transparent"
+else:
+    print "Choosing max diff to be transparent"
 print "Transparent Difference:", transparentDiff
+print "Opaque Difference:", opaqueDiff
 
 # Calculate true colors
 
@@ -269,9 +304,6 @@ def getTransparentImage(trueColors, alpha):
     transparentImage = np.concatenate((trueColors, idealAlpha[:, :, None]),
                                       axis = 2)
     return transparentImage
-
-# TODO: Stop assuming the hub passes through the mean of the images
-hubCenter = np.mean(imMean, axis = (0, 1))
 
 trueColors = getTrueColors(imMean, hubCenter, idealAlpha)
 transparentImage = getTransparentImage(trueColors, idealAlpha)
