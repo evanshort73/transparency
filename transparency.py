@@ -1,15 +1,10 @@
 import numpy as np
 from scipy.misc import imread, imsave
-#from matplotlib import pyplot as plt
-from checkerboard import checkerboard
-
-# Setup
 
 im1 = imread("in1.png").astype(float) / 255
 im2 = imread("in2.png").astype(float) / 255
 
-imsave("beforeColorAdjustment.png",
-       np.round(checkerboard(im1, im2) * 255).astype(np.uint8))
+# Calculate hub axis
 
 def getHubAxis(im1, im2):
     imDiff = im2 - im1
@@ -29,18 +24,18 @@ def getFlatError(im1, im2, hubAxis):
     return flatError
 
 hubAxis = getHubAxis(im1, im2)
-flatError = getFlatError(im1, im2, hubAxis)
-
 print "Hub Axis:", hubAxis
+
+flatError = getFlatError(im1, im2, hubAxis)
 print "Flat Error:", flatError
+
+# Calculate hub center and cutoff values
 
 imMean = im1 + im2
 imMean *= 0.5
 bgDiff = np.dot(im2 - im1, hubAxis)
 bgDiff -= np.mean(bgDiff)
 del im1, im2
-
-# Calculate transparency
 
 def getStairwayError(aSorted):
     stairways = np.cumsum(aSorted)
@@ -77,8 +72,6 @@ def denseMin(a, densityReward = 0.1, halfLife = 0.1):
     density = getDensity(aSorted, halfLife)
     density *= densityReward
     density -= stairwayError
-    #plt.plot(aSorted, density * 0.000001)
-    #plt.show()
     return aSorted[np.argmax(density)]
 
 def getCutoffDiff(bgDiff, direction):
@@ -110,63 +103,64 @@ def getHubCenterCost(imMean, hubCenter, weights):
     hubCenterCost = np.sum(centeredImMeanNormSquared) / np.sum(weights)
     return hubCenterCost
 
-# TODO: Smooth the difference between the images before using it to find alpha
-def getIdealAlpha(bgDiff, opaqueDiff, transparentDiff):
-    idealAlpha = bgDiff - transparentDiff
-    idealAlpha /= opaqueDiff - transparentDiff
-    np.clip(idealAlpha, 0, 1, out = idealAlpha)
-    # Remove negative zero so that we don't get negative infinity from division
-    np.abs(idealAlpha, out = idealAlpha)
-    return idealAlpha
-
 # TODO: Consider weighting the pixels by flattened error when calculating
 # opaqueDiff and transparentDiff
 # TODO: Stop assuming transparentDiff is constant throughout the image
+print "Transparent Min:"
 minDiff = getCutoffDiff(bgDiff, -1)
-maxDiff = getCutoffDiff(bgDiff, 1)
 transparentMinWeights = getMountainWeights(bgDiff, minDiff)
 transparentMinHubCenter = getHubCenter(imMean, transparentMinWeights)
+print "    Hub Center:", transparentMinHubCenter
 transparentMinCost = getHubCenterCost(imMean, transparentMinHubCenter,
                                       transparentMinWeights)
+print "    Cost:", transparentMinCost
 del transparentMinWeights
+
+print "Transparent Max:"
+maxDiff = getCutoffDiff(bgDiff, 1)
 transparentMaxWeights = getMountainWeights(bgDiff, maxDiff)
 transparentMaxHubCenter = getHubCenter(imMean, transparentMaxWeights)
+print "    Hub Center:", transparentMaxHubCenter
 transparentMaxCost = getHubCenterCost(imMean, transparentMaxHubCenter,
                                       transparentMaxWeights)
+print "    Cost:", transparentMaxCost
 del transparentMaxWeights
+
 if transparentMinCost <= transparentMaxCost:
+    print "Choosing min diff to be transparent"
     transparentDiff = minDiff
     opaqueDiff = maxDiff
     hubCenter = transparentMinHubCenter
 else:
+    print "Choosing max diff to be transparent"
     transparentDiff = maxDiff
     opaqueDiff = minDiff
     hubCenter = transparentMaxHubCenter
-
-idealAlpha = getIdealAlpha(bgDiff, opaqueDiff, transparentDiff)
-del bgDiff
-
-print "Transparent Min:"
-print "    Hub Center:", transparentMinHubCenter
-print "    Cost:", transparentMinCost
-print "Transparent Max:"
-print "    Hub Center:", transparentMaxHubCenter
-print "    Cost:", transparentMaxCost
-if transparentMinCost <= transparentMaxCost:
-    print "Choosing min diff to be transparent"
-else:
-    print "Choosing max diff to be transparent"
 print "Transparent Difference:", transparentDiff
 print "Opaque Difference:", opaqueDiff
 
+# Calculate transparency values
+
+# TODO: Smooth the difference between the images before using it to find alpha
+def getAlpha(bgDiff, opaqueDiff, transparentDiff):
+    alpha = bgDiff - transparentDiff
+    alpha /= opaqueDiff - transparentDiff
+    np.clip(alpha, 0, 1, out = alpha)
+    # Remove negative zero so that we don't get negative infinity from division
+    np.abs(alpha, out = alpha)
+    return alpha
+
+alpha = getAlpha(bgDiff, opaqueDiff, transparentDiff)
+del bgDiff
+
 # Calculate true colors
 
-def getTrueColors(imMean, hubCenter, idealAlpha):
+def getTrueColors(imMean, hubCenter, alpha):
     centeredImMean = imMean - hubCenter
 
     oldSettings = np.seterr(divide = "ignore")
     
-    colorMultiplier = np.reciprocal(idealAlpha)
+    colorMultiplier = np.reciprocal(alpha)
     
     perChannelCutoff = np.sign(centeredImMean)
     perChannelCutoff += 1
@@ -194,15 +188,16 @@ def getTrueColors(imMean, hubCenter, idealAlpha):
     np.clip(trueColors, 0, 1, out = trueColors)
     return trueColors
 
-# TODO: If the true color falls outside the color space, should the
-# transparency value be idealAlpha, compromiseAlpha, or something in between?
+# It's possible to choose better values for color and alpha in terms of
+# reproducing the original images, but that would require more complicated math
+# and it wouldn't be as good at preserving fully transparent areas.
 def getTransparentImage(trueColors, alpha):
-    transparentImage = np.concatenate((trueColors, idealAlpha[:, :, None]),
+    transparentImage = np.concatenate((trueColors, alpha[:, :, None]),
                                       axis = 2)
     return transparentImage
 
-trueColors = getTrueColors(imMean, hubCenter, idealAlpha)
-transparentImage = getTransparentImage(trueColors, idealAlpha)
+trueColors = getTrueColors(imMean, hubCenter, alpha)
+transparentImage = getTransparentImage(trueColors, alpha)
 
-imsave("idealAlpha.png", idealAlpha)
+imsave("alpha.png", alpha)
 imsave("transparentImage.png", transparentImage)
