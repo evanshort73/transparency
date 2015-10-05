@@ -1,13 +1,11 @@
-RGB Scale: [[ 0.87686271  0.89549091  0.86719321]
- [ 0.48074087  0.4450798   0.49797183]]
-Hub Axis: [-0.57938423 -0.62257897 -0.5260317 ]
-Flat Error: 506.479932488
+Hub Axis: [-0.57993379 -0.62145455 -0.52675521]
+Flat Error: 563.625760116
 Transparent Min:
-    Hub Center: [ 0.31858435  0.27224321  0.31393633]
-    Cost: 0.0140328717997
+    Hub Center: [ 0.30780287  0.25217381  0.30259515]
+    Cost: 0.0123712410724
 Transparent Max:
-    Hub Center: [ 0.42093768  0.40291736  0.40494372]
-    Cost: 0.00561134535241
+    Hub Center: [ 0.42704915  0.40463474  0.4085152 ]
+    Cost: 0.00500342488462
 Choosing max diff to be transparent
-Transparent Difference: 0.318326379236
-Opaque Difference: -0.379931010215
+Transparent Difference: 0.319176797044
+Opaque Difference: -0.392502840526

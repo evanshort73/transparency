@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.misc import imread, imsave
 #from matplotlib import pyplot as plt
-from rgbScale import getRgbScaleAndHubAxis, initRgbScale
 from checkerboard import checkerboard
 
 # Setup
@@ -12,31 +11,34 @@ im2 = imread("in2.png").astype(float) / 255
 imsave("beforeColorAdjustment.png",
        np.round(checkerboard(im1, im2) * 255).astype(np.uint8))
 
-# Adjust colors
+def getHubAxis(im1, im2):
+    imDiff = im2 - im1
+    imDiff -= np.mean(imDiff, axis = (0, 1))
+    xxT = np.einsum("ijk,ijl", imDiff, imDiff)
+    eigVals, eigVecs = np.linalg.eig(xxT)
+    eigIndex = np.argmax(eigVals)
+    hubAxis = eigVecs[:, eigIndex]
+    return hubAxis
 
-rgbScale, hubAxis, objective, objectiveHistory = getRgbScaleAndHubAxis(im1,
-                                                                       im2)
+def getFlatError(im1, im2, hubAxis):
+    imDiff = im2 - im1
+    imDiff -= np.mean(imDiff, axis = (0, 1))
+    xxT = np.einsum("ijk,ijl", imDiff, imDiff)
+    xTx = np.dot(np.ravel(imDiff), np.ravel(imDiff))
+    flatError = xTx - np.dot(hubAxis, np.dot(xxT, hubAxis))
+    return flatError
 
-#plt.plot(objectiveHistory)
-#plt.show()
+hubAxis = getHubAxis(im1, im2)
+flatError = getFlatError(im1, im2, hubAxis)
 
-print "RGB Scale:", rgbScale * initRgbScale(im1, im2)
 print "Hub Axis:", hubAxis
-print "Flat Error:", objective
+print "Flat Error:", flatError
 
-scaledIm1 = im1 * rgbScale[0]
-del im1
-scaledIm2 = im2 * rgbScale[1]
-del im2
-
-imsave("afterColorScaling.png",
-       np.round(checkerboard(scaledIm1, scaledIm2) * 255).astype(np.uint8))
-
-imMean = scaledIm1 + scaledIm2
+imMean = im1 + im2
 imMean *= 0.5
-bgDiff = np.dot(scaledIm2 - scaledIm1, hubAxis)
+bgDiff = np.dot(im2 - im1, hubAxis)
 bgDiff -= np.mean(bgDiff)
-del scaledIm1, scaledIm2
+del im1, im2
 
 # Calculate transparency
 
