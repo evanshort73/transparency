@@ -1,8 +1,125 @@
 import numpy as np
 from scipy.misc import imread, imsave
 
-im1 = imread("in1.png").astype(float) / 255
-im2 = imread("in2.png").astype(float) / 255
+im1 = imread("in1.png")[:, :, :3].astype(float) / 255
+im2 = imread("in2.png")[:, :, :3].astype(float) / 255
+
+# Returns two arbitrary 3D unit vectors perpendicular to n and to each other.
+# The vectors are chosen in a way that makes the calculations simple
+# in order to reduce numerical error.
+def getPlaneAxes(n):
+    # As a further precaution against numerical error, the calculations use the
+    # smallest component of n less often than the larger two.
+    minComponent = np.argmin(np.abs(n))
+    i = np.mod(np.arange(minComponent, minComponent + 3), 3)
+
+    planeAxis1 = np.empty(3)
+    planeAxis1[i] = [0, n[i[2]], -n[i[1]]]
+    planeAxis1 /= np.linalg.norm(planeAxis1)
+
+    planeAxis2 = np.empty(3)
+    planeAxis2[i] = [-n[i[1]] * n[i[1]] - n[i[2]] * n[i[2]],
+                     n[i[0]] * n[i[1]],
+                     n[i[0]] * n[i[2]]]
+    planeAxis2 /= np.linalg.norm(planeAxis2)
+
+    return planeAxis1, planeAxis2
+
+hubAxis = np.mean(im2, axis = (0, 1)) - np.mean(im1, axis = (0, 1))
+planeAxis1, planeAxis2 = getPlaneAxes(hubAxis)
+
+flatIm1 = np.empty(im1.shape[:2] + (3,))
+flatIm1[:, :, 0] = np.dot(im1, planeAxis1)
+flatIm1[:, :, 1] = np.dot(im1, planeAxis2)
+flatIm1[:, :, 2] = np.dot(im1, hubAxis * 0.01 / np.linalg.norm(hubAxis))
+flatIm1 -= np.mean(flatIm1, axis = (0, 1))
+
+savedFlatIm1 = flatIm1 - np.min(flatIm1, axis = (0, 1))
+savedFlatIm1 *= 255 / np.max(savedFlatIm1)
+np.round(savedFlatIm1, out = savedFlatIm1)
+imsave("flatIm1.png", savedFlatIm1.astype(np.uint8))
+del savedFlatIm1
+
+flatIm2 = np.empty(im2.shape[:2] + (3,))
+flatIm2[:, :, 0] = np.dot(im2, planeAxis1)
+flatIm2[:, :, 1] = np.dot(im2, planeAxis2)
+flatIm2[:, :, 2] = np.dot(im2, hubAxis * 0.01 / np.linalg.norm(hubAxis))
+flatIm2 -= np.mean(flatIm2, axis = (0, 1))
+
+savedFlatIm2 = flatIm2 - np.min(flatIm2, axis = (0, 1))
+savedFlatIm2 *= 255 / np.max(savedFlatIm2)
+np.round(savedFlatIm2, out = savedFlatIm2)
+imsave("flatIm2.png", savedFlatIm2.astype(np.uint8))
+del savedFlatIm2
+
+def convolve(fixed, moving, overhang):
+    fixedShape = np.asarray(fixed.shape)
+    movingShape = np.asarray(moving.shape)
+    overhang = np.asarray(overhang)
+
+    wrappedShape = tuple(fixedShape + overhang)
+
+    resultShape = tuple(fixedShape - movingShape + 1 + 2 * overhang)
+
+    wrapped = np.fft.irfft2(np.fft.rfft2(fixed[:, :],
+                                         s = wrappedShape) \
+                            * np.fft.rfft2(moving[::-1, ::-1],
+                                           s = wrappedShape),
+                            s = wrappedShape)
+    result = wrapped[-resultShape[0]:, -resultShape[1]:]
+
+    return result
+
+def colorConvolve(fixed, moving, overhang):
+    fixedShape = np.asarray(fixed.shape[:2])
+    movingShape = np.asarray(moving.shape[:2])
+    overhang = np.asarray(overhang)
+
+    wrappedShape = tuple(fixedShape + overhang)
+
+    resultShape = tuple(fixedShape - movingShape + 1 + 2 * overhang)
+    result = np.zeros(resultShape)
+
+    for i in xrange(fixed.shape[2]):
+        wrapped = np.fft.irfft2(np.fft.rfft2(fixed[:, :, i],
+                                             s = wrappedShape) \
+                                * np.fft.rfft2(moving[::-1, ::-1, i],
+                                               s = wrappedShape),
+                                s = wrappedShape)
+        result[:, :] += wrapped[-resultShape[0]:, -resultShape[1]:]
+
+    return result
+
+smallShape = np.minimum(im1.shape[:2], im2.shape[:2])
+overhang = im2.shape[:2] - (smallShape + 1) // 2
+scores = convolve(np.sum(np.square(flatIm1), axis = 2),
+                  np.ones(im2.shape[:2]),
+                  overhang) \
+         + convolve(np.ones(im1.shape[:2]),
+                    np.sum(np.square(flatIm2), axis = 2),
+                    overhang) \
+         - 2 * colorConvolve(flatIm1, flatIm2, overhang)
+scores /= convolve(np.ones(im1.shape[:2]), np.ones(im2.shape[:2]), overhang)
+
+alignment = np.unravel_index(np.argmin(scores), scores.shape) - overhang
+print alignment
+
+scores -= np.min(scores)
+scores *= 255 / np.max(scores)
+np.round(scores, out = scores)
+np.clip(scores, 0, 255, out = scores)
+imsave("convolutionScores.png", scores.astype(np.uint8))
+
+im1Start = np.maximum(alignment, 0)
+im1Stop = np.minimum(alignment + im2.shape[:2], im1.shape[:2])
+im1 = im1[im1Start[0]:im1Stop[0], im1Start[1]:im1Stop[1]]
+
+im2Start = im1Start - alignment
+im2Stop = im1Stop - alignment
+im2 = im2[im2Start[0]:im2Stop[0], im2Start[1]:im2Stop[1]]
+
+imsave("alignedIm1.png", (im1 * 255).astype(np.uint8))
+imsave("alignedIm2.png", (im2 * 255).astype(np.uint8))
 
 # Calculate hub axis
 
