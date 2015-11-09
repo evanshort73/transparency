@@ -4,6 +4,63 @@ from scipy.misc import imread, imsave
 im1 = imread("in1.png").astype(float) / 255
 im2 = imread("in2.png").astype(float) / 255
 
+# Align images
+
+def convolve(fixed, moving, overhang):
+    fixedShape = np.asarray(fixed.shape)
+    movingShape = np.asarray(moving.shape)
+    overhang = np.asarray(overhang)
+
+    wrappedShape = tuple(fixedShape + overhang)
+
+    resultShape = tuple(fixedShape - movingShape + 1 + 2 * overhang)
+
+    wrapped = np.fft.irfft2(np.fft.rfft2(fixed[:, :],
+                                         s = wrappedShape) \
+                            * np.fft.rfft2(moving[::-1, ::-1],
+                                           s = wrappedShape),
+                            s = wrappedShape)
+    result = wrapped[-resultShape[0]:, -resultShape[1]:]
+
+    return result
+
+estimatedHubAxis = np.mean(im2, axis = (0, 1)) - np.mean(im1, axis = (0, 1))
+
+hubIm1 = np.dot(im1, estimatedHubAxis)
+hubIm1 -= np.mean(hubIm1)
+
+hubIm2 = np.dot(im2, estimatedHubAxis)
+hubIm2 -= np.mean(hubIm2)
+
+smallShape = np.minimum(im1.shape[:2], im2.shape[:2])
+overhang = im2.shape[:2] - (smallShape + 1) // 2
+alignmentScores = convolve(hubIm1, hubIm2, overhang)
+alignmentScores /= np.sqrt(convolve(np.square(hubIm1), np.square(hubIm2),
+                                    overhang))
+del hubIm1
+del hubIm2
+
+alignment = np.unravel_index(np.argmin(alignmentScores),
+                             alignmentScores.shape) - overhang
+print "Alignment:", alignment
+
+alignmentScores -= np.min(alignmentScores)
+alignmentScores *= 255 / np.max(alignmentScores)
+np.round(alignmentScores, out = alignmentScores)
+np.clip(alignmentScores, 0, 255, out = alignmentScores)
+imsave("alignmentScores.png", alignmentScores.astype(np.uint8))
+del alignmentScores
+
+im1Start = np.maximum(alignment, 0)
+im1Stop = np.minimum(alignment + im2.shape[:2], im1.shape[:2])
+alignedIm1 = im1[im1Start[0]:im1Stop[0], im1Start[1]:im1Stop[1]]
+del im1
+
+im2Start = im1Start - alignment
+im2Stop = im1Stop - alignment
+alignedIm2 = im2[im2Start[0]:im2Stop[0], im2Start[1]:im2Stop[1]]
+del im2
+
 # Calculate hub axis
 
 def getHubAxis(im1, im2):
@@ -23,19 +80,19 @@ def getFlatError(im1, im2, hubAxis):
     flatError = xTx - np.dot(hubAxis, np.dot(xxT, hubAxis))
     return flatError
 
-hubAxis = getHubAxis(im1, im2)
+hubAxis = getHubAxis(alignedIm1, alignedIm2)
 print "Hub Axis:", hubAxis
 
-flatError = getFlatError(im1, im2, hubAxis)
+flatError = getFlatError(alignedIm1, alignedIm2, hubAxis)
 print "Flat Error:", flatError
 
 # Calculate hub center and cutoff values
 
-imMean = im1 + im2
+imMean = alignedIm1 + alignedIm2
 imMean *= 0.5
-bgDiff = np.dot(im2 - im1, hubAxis)
+bgDiff = np.dot(alignedIm2 - alignedIm1, hubAxis)
 bgDiff -= np.mean(bgDiff)
-del im1, im2
+del alignedIm1, alignedIm2
 
 def getStairwayError(aSorted):
     stairways = np.cumsum(aSorted)

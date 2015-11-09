@@ -1,11 +1,12 @@
-Hub Axis: [-0.57993379 -0.62145455 -0.52675521]
-Flat Error: 563.625760116
+Alignment: [2 2]
+Hub Axis: [-0.58001961 -0.62135907 -0.52677335]
+Flat Error: 570.56707029
 Transparent Min:
-    Hub Center: [ 0.30780287  0.25217381  0.30259515]
-    Cost: 0.0123712410724
+    Hub Center: [ 0.30741704  0.25191974  0.30229107]
+    Cost: 0.0122490887044
 Transparent Max:
-    Hub Center: [ 0.42704915  0.40463474  0.4085152 ]
-    Cost: 0.00500342488462
+    Hub Center: [ 0.42663018  0.40419095  0.40813104]
+    Cost: 0.00501573898705
 Choosing max diff to be transparent
-Transparent Difference: 0.319176797044
-Opaque Difference: -0.392502840526
+Transparent Difference: 0.320403128511
+Opaque Difference: -0.393136890942
