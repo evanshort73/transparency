@@ -105,7 +105,7 @@ hubAxis = estimateHubAxis(im1, im2)
 hubIm1 = np.dot(im1, hubAxis)
 hubIm2 = np.dot(im2, hubAxis)
 
-filterRadius = getTotalArea(im1, im2) * 0.000003
+filterRadius = np.sqrt(getTotalArea(im1, im2)) * 0.01
 print "Filter radius:", filterRadius
 
 filters = getFilters(getFilterSize(filterRadius, sigmasInFrame = 3),
