@@ -1,13 +1,13 @@
-Filter radius: 3.6
-Alignment: [4 0]
-Hub Axis: [-0.58000076 -0.62139502 -0.5267517 ]
-Flat Error: 575.830406302
+Filter radius: 10.9544511501
+Alignment: [4 1]
+Hub Axis: [-0.58002771 -0.62136014 -0.52676316]
+Flat Error: 576.36554365
 Transparent Min:
-    Hub Center: [ 0.30721965  0.25157848  0.30215337]
-    Cost: 0.0122335887392
+    Hub Center: [ 0.30717872  0.25161523  0.30211742]
+    Cost: 0.0122142858388
 Transparent Max:
-    Hub Center: [ 0.42676945  0.40431726  0.40823778]
-    Cost: 0.00502132114778
+    Hub Center: [ 0.42655588  0.40408895  0.40803699]
+    Cost: 0.00502339289924
 Choosing max diff to be transparent
-Transparent Difference: 0.320218796119
-Opaque Difference: -0.392322461011
+Transparent Difference: 0.32013944794
+Opaque Difference: -0.392980798649
