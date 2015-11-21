@@ -6,42 +6,139 @@ im2 = imread("in2.png").astype(float) / 255
 
 # Align images
 
+def estimateHubAxis(im1, im2):
+    hubAxis = np.mean(im2, axis = (0, 1)) - np.mean(im1, axis = (0, 1))
+    hubAxis /= np.linalg.norm(hubAxis)
+    return hubAxis
+
+def getTotalArea(*images):
+    area = 0
+    for image in images:
+        area += image.shape[0] * image.shape[1]
+    return area
+
+# filterRadius = 2 * sigma
+def getFilterSize(filterRadius, sigmasInFrame):
+    filterSize = int(round(filterRadius * sigmasInFrame))
+    return filterSize
+
+def getGaussian(length, sigmasInFrame):
+    x = np.linspace(-sigmasInFrame, sigmasInFrame, length, endpoint = True)
+    np.square(x, out = x)
+    x *= -0.5
+    np.exp(x, out = x)
+    x *= sigmasInFrame / (0.5 * length * np.sqrt(2 * np.pi))
+    return x
+
+def getSpotlight(shape, sigmasInFrame):
+    column = getGaussian(shape[0], sigmasInFrame)
+    row = getGaussian(shape[1], sigmasInFrame)
+    spotlight = column[:, None] * row
+    return spotlight
+
+def getFilterGradient(angle, filterSize):
+    x = np.cos(angle)
+    y = np.sin(angle)
+    row = np.linspace(-x, x, filterSize, endpoint = True)
+    column = np.linspace(y, -y, filterSize, endpoint = True)
+    gradient = column[:, None] + row
+    return gradient
+
+# filter orientations are counterclockwise in the interval [3:00, 9:00)
+def getFilters(filterSize, sigmasInFrame, filterCount):
+    miniSpotlight = getSpotlight((filterSize, filterSize), sigmasInFrame)
+    filters = []
+    for i in xrange(filterCount):
+        angle = np.pi * i / float(filterCount)
+        gradient = getFilterGradient(angle, filterSize)
+        gradient *= miniSpotlight
+        filters.append(gradient)
+    return filters
+
+def getHalfOverhang(fixedShape, movingShape):
+    fixedShape = np.asarray(fixedShape[:2])
+    movingShape = np.asarray(movingShape[:2])
+    smallShape = np.minimum(fixedShape, movingShape)
+    overhang = movingShape - (smallShape + 1) // 2
+    return overhang
+
+def getConvolvedShape(fixedShape, movingShape, overhang):
+    fixedShape = np.asarray(fixedShape[:2])
+    movingShape = np.asarray(movingShape[:2])
+    overhang = np.asarray(overhang[:2])
+    convolvedShape = tuple(fixedShape - movingShape + 1 + 2 * overhang)
+    return convolvedShape
+
 def convolve(fixed, moving, overhang):
-    fixedShape = np.asarray(fixed.shape)
-    movingShape = np.asarray(moving.shape)
-    overhang = np.asarray(overhang)
+    wrappedShape = tuple(np.asarray(fixed.shape) + np.asarray(overhang))
+    movingReversed = moving[::-1, ::-1]
+    wrapped = np.fft.irfft2(
+        np.fft.rfft2(fixed, s = wrappedShape) \
+        * np.fft.rfft2(moving[::-1, ::-1], s = wrappedShape),
+        s = wrappedShape)
 
-    wrappedShape = tuple(fixedShape + overhang)
-
-    resultShape = tuple(fixedShape - movingShape + 1 + 2 * overhang)
-
-    wrapped = np.fft.irfft2(np.fft.rfft2(fixed[:, :],
-                                         s = wrappedShape) \
-                            * np.fft.rfft2(moving[::-1, ::-1],
-                                           s = wrappedShape),
-                            s = wrappedShape)
+    resultShape = getConvolvedShape(fixed.shape, moving.shape, overhang)
     result = wrapped[-resultShape[0]:, -resultShape[1]:]
-
     return result
 
-estimatedHubAxis = np.mean(im2, axis = (0, 1)) - np.mean(im1, axis = (0, 1))
+def getAlignment(alignmentScores, overhang):
+    alignment = np.unravel_index(np.argmax(alignmentScores),
+                                 alignmentScores.shape) - overhang
+    return alignment
 
-hubIm1 = np.dot(im1, estimatedHubAxis)
-hubIm1 -= np.mean(hubIm1)
+def crop(fixed, moving, alignment):
+    alignment = np.asarray(alignment)
 
-hubIm2 = np.dot(im2, estimatedHubAxis)
-hubIm2 -= np.mean(hubIm2)
+    fixedStart = np.maximum(alignment, 0)
+    fixedStop = np.minimum(alignment + moving.shape[:2], fixed.shape[:2])
+    croppedFixed = fixed[fixedStart[0]:fixedStop[0],
+                         fixedStart[1]:fixedStop[1]]
 
-smallShape = np.minimum(im1.shape[:2], im2.shape[:2])
-overhang = im2.shape[:2] - (smallShape + 1) // 2
-alignmentScores = convolve(hubIm1, hubIm2, overhang)
-alignmentScores /= np.sqrt(convolve(np.square(hubIm1), np.square(hubIm2),
-                                    overhang))
-del hubIm1
-del hubIm2
+    movingStart = fixedStart - alignment
+    movingStop = fixedStop - alignment
+    croppedMoving = moving[movingStart[0]:movingStop[0],
+                           movingStart[1]:movingStop[1]]
 
-alignment = np.unravel_index(np.argmin(alignmentScores),
-                             alignmentScores.shape) - overhang
+    return croppedFixed, croppedMoving
+
+hubAxis = estimateHubAxis(im1, im2)
+hubIm1 = np.dot(im1, hubAxis)
+hubIm2 = np.dot(im2, hubAxis)
+
+filterRadius = getTotalArea(im1, im2) * 0.000003
+print "Filter radius:", filterRadius
+
+filters = getFilters(getFilterSize(filterRadius, sigmasInFrame = 3),
+                     sigmasInFrame = 3, filterCount = 2)
+
+spotlight1 = getSpotlight(
+    getConvolvedShape(hubIm1.shape, filters[0].shape, overhang = (0, 0)),
+    sigmasInFrame = 3)
+spotlight2 = getSpotlight(
+    getConvolvedShape(hubIm2.shape, filters[0].shape, overhang = (0, 0)),
+    sigmasInFrame = 3)
+
+overhang = getHalfOverhang(spotlight1.shape, spotlight2.shape)
+
+alignmentScores = np.zeros(getConvolvedShape(
+    spotlight1.shape, spotlight2.shape, overhang))
+
+for i in xrange(len(filters)):
+    filteredIm1 = convolve(hubIm1, filters[i], overhang = (0, 0))
+    np.abs(filteredIm1, out = filteredIm1)
+    filteredIm1 *= spotlight1
+
+    filteredIm2 = convolve(hubIm2, filters[i], overhang = (0, 0))
+    np.abs(filteredIm2, out = filteredIm2)
+    filteredIm2 *= spotlight2
+
+    alignmentScores += convolve(filteredIm1, filteredIm2, overhang)
+
+del filteredIm1, filteredIm2
+del spotlight1, spotlight2
+del hubIm1, hubIm2
+
+alignment = getAlignment(alignmentScores, overhang)
 print "Alignment:", alignment
 
 alignmentScores -= np.min(alignmentScores)
@@ -51,15 +148,8 @@ np.clip(alignmentScores, 0, 255, out = alignmentScores)
 imsave("alignmentScores.png", alignmentScores.astype(np.uint8))
 del alignmentScores
 
-im1Start = np.maximum(alignment, 0)
-im1Stop = np.minimum(alignment + im2.shape[:2], im1.shape[:2])
-alignedIm1 = im1[im1Start[0]:im1Stop[0], im1Start[1]:im1Stop[1]]
-del im1
-
-im2Start = im1Start - alignment
-im2Stop = im1Stop - alignment
-alignedIm2 = im2[im2Start[0]:im2Stop[0], im2Start[1]:im2Stop[1]]
-del im2
+alignedIm1, alignedIm2 = crop(im1, im2, alignment)
+del im1, im2
 
 # Calculate hub axis
 
