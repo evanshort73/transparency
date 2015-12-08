@@ -1,7 +1,7 @@
 Filter radius: 31.68
-Alignment: [-4  9]
-Hub Axis: [-0.58213893 -0.59478354 -0.55438868]
-Flat Error: 13058.9213379
-Transparent Difference: 1.13051027561
-Opaque Difference: 0.406529434583
-Hub Center: [ 0.4751169   0.45757328  0.45392622]
+Alignment: [ 241 -158]
+Hub Axis: [-0.58735847 -0.59748249 -0.54591639]
+Flat Error: 15702.6727711
+Transparent Difference: -1.14014872531
+Opaque Difference: -0.451928973207
+Hub Center: [ 0.47089929  0.44991909  0.44390552]
