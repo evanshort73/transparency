@@ -184,13 +184,20 @@ bgDiff = np.dot(alignedIm2 - alignedIm1, hubAxis)
 bgDiff -= np.mean(bgDiff)
 del alignedIm1, alignedIm2
 
-def getStairwayError(aSorted):
-    stairways = np.cumsum(aSorted)
-    walls = aSorted * np.arange(len(aSorted))
-    walls -= stairways
-    return walls
+def getStairwayError(aSorted, weights = 1):
+    negTerm = aSorted * weights
+    np.cumsum(negTerm, out = negTerm)
 
-def getDensity(aSorted, halfLife):
+    posTerm = np.empty_like(aSorted)
+    posTerm[:] = weights
+    np.cumsum(posTerm, out = posTerm)
+    posTerm *= aSorted
+
+    result = posTerm
+    result -= negTerm
+    return result
+
+def getDensity(aSorted, halfLife, weights = 1):
     k = np.log(2) / halfLife
     
     posExp = aSorted * k
@@ -198,11 +205,13 @@ def getDensity(aSorted, halfLife):
     
     negExp = aSorted * -k
     np.exp(negExp, out = negExp)
-    
-    leftSide = np.cumsum(posExp)
+
+    leftSide = posExp * weights
+    np.cumsum(leftSide, out = leftSide)
     leftSide *= negExp
 
     rightSide = negExp
+    rightSide *= weights
     rightSide[:-1] = rightSide[1:]
     rightSide[-1] = 0
     np.cumsum(rightSide[::-1], axis = 0, out = rightSide[::-1])
@@ -213,16 +222,23 @@ def getDensity(aSorted, halfLife):
     result *= k
     return result
 
-def denseMin(a, densityReward = 0.1, halfLife = 0.1):
-    aSorted = np.sort(np.ravel(a))
-    stairwayError = getStairwayError(aSorted)
-    density = getDensity(aSorted, halfLife)
+def denseMin(a, densityReward = 0.1, halfLife = 0.1, weights = 1):
+    a = np.ravel(a)
+    weights = np.ravel(weights)
+    order = np.argsort(a)
+    a = a[order]
+    if len(weights) > 1:
+        weights = weights[order]
+    del order
+
+    stairwayError = getStairwayError(a, weights)
+    density = getDensity(a, halfLife, weights)
     density *= densityReward
     density -= stairwayError
-    return aSorted[np.argmax(density)]
+    return a[np.argmax(density)]
 
-def getCutoffDiff(bgDiff, direction):
-    cutoffDiff = denseMin(bgDiff * -direction) * -direction
+def getCutoffDiff(bgDiff, direction, weights = 1):
+    cutoffDiff = denseMin(bgDiff * -direction, weights = weights) * -direction
     return cutoffDiff
 
 def getMountainWeights(bgDiff, mountainCenter, halfLife = 0.1):
@@ -253,9 +269,12 @@ def getHubCenterCost(imMean, hubCenter, weights):
 # TODO: Consider weighting the pixels by flattened error when calculating
 # opaqueDiff and transparentDiff
 # TODO: Stop assuming transparentDiff is constant throughout the image
+spotlight = getSpotlight(bgDiff.shape, sigmasInFrame = 2)
+
 print "Transparent Min:"
-minDiff = getCutoffDiff(bgDiff, -1)
+minDiff = getCutoffDiff(bgDiff, -1, spotlight)
 transparentMinWeights = getMountainWeights(bgDiff, minDiff)
+transparentMinWeights *= spotlight
 transparentMinHubCenter = getHubCenter(imMean, transparentMinWeights)
 print "    Hub Center:", transparentMinHubCenter
 transparentMinCost = getHubCenterCost(imMean, transparentMinHubCenter,
@@ -264,8 +283,9 @@ print "    Cost:", transparentMinCost
 del transparentMinWeights
 
 print "Transparent Max:"
-maxDiff = getCutoffDiff(bgDiff, 1)
+maxDiff = getCutoffDiff(bgDiff, 1, spotlight)
 transparentMaxWeights = getMountainWeights(bgDiff, maxDiff)
+transparentMaxWeights *= spotlight
 transparentMaxHubCenter = getHubCenter(imMean, transparentMaxWeights)
 print "    Hub Center:", transparentMaxHubCenter
 transparentMaxCost = getHubCenterCost(imMean, transparentMaxHubCenter,
