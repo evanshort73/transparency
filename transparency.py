@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.misc import imread, imsave
+# from matplotlib import pyplot as plt
 
 im1 = imread("in1.png").astype(float) / 255
 im2 = imread("in2.png").astype(float) / 255
@@ -181,49 +182,39 @@ print "Flat Error:", flatError
 imMean = alignedIm1 + alignedIm2
 imMean *= 0.5
 bgDiff = np.dot(alignedIm2 - alignedIm1, hubAxis)
-bgDiff -= np.mean(bgDiff)
 del alignedIm1, alignedIm2
 
-def getStairwayError(aSorted):
-    stairways = np.cumsum(aSorted)
-    walls = aSorted * np.arange(len(aSorted))
-    walls -= stairways
-    return walls
+def extrapolateVarianceFromPreviousElementsTakingEachElementAsMean(x, weights):
+    middleTerm = x * weights
+    np.cumsum(middleTerm, out = middleTerm)
+    middleTerm *= x
+    middleTerm *= -2
+    variance = middleTerm
+    variance += np.cumsum(np.square(x) * weights)
+    variance /= np.cumsum(weights)
+    variance += np.square(x)
+    return variance
 
-def getDensity(aSorted, halfLife):
-    k = np.log(2) / halfLife
-    
-    posExp = aSorted * k
-    np.exp(posExp, out = posExp)
-    
-    negExp = aSorted * -k
-    np.exp(negExp, out = negExp)
-    
-    leftSide = np.cumsum(posExp)
-    leftSide *= negExp
+def getMeanOfFirstGaussian(x, weights):
+    cost = extrapolateVarianceFromPreviousElementsTakingEachElementAsMean(
+        x, weights)
+    cost /= np.cumsum(weights)
+    endOfNoise = np.argmax(cost)
+    bestIndex = endOfNoise + np.argmin(cost[endOfNoise:])
+    # plt.plot(x[endOfNoise + 3000:], cost[endOfNoise + 3000:] * 0.01)
+    return x[bestIndex]
 
-    rightSide = negExp
-    rightSide[:-1] = rightSide[1:]
-    rightSide[-1] = 0
-    np.cumsum(rightSide[::-1], axis = 0, out = rightSide[::-1])
-    rightSide *= posExp
+def getTransparentDiff(sortedBgDiff, weights):
+    if np.sum(sortedBgDiff) >= 0:
+        sortedBgDiff = sortedBgDiff[::-1]
+        weights = weights[::-1]
+    return getMeanOfFirstGaussian(sortedBgDiff, weights)
 
-    result = leftSide
-    result += rightSide
-    result *= k
-    return result
-
-def denseMin(a, densityReward = 0.1, halfLife = 0.1):
-    aSorted = np.sort(np.ravel(a))
-    stairwayError = getStairwayError(aSorted)
-    density = getDensity(aSorted, halfLife)
-    density *= densityReward
-    density -= stairwayError
-    return aSorted[np.argmax(density)]
-
-def getCutoffDiff(bgDiff, direction):
-    cutoffDiff = denseMin(bgDiff * -direction) * -direction
-    return cutoffDiff
+def getOpaqueDiff(sortedBgDiff, weights):
+    if np.sum(sortedBgDiff) < 0:
+        sortedBgDiff = sortedBgDiff[::-1]
+        weights = weights[::-1]
+    return getMeanOfFirstGaussian(sortedBgDiff, weights)
 
 def getMountainWeights(bgDiff, mountainCenter, halfLife = 0.1):
     mountainWeights = bgDiff - mountainCenter
@@ -241,50 +232,27 @@ def getHubCenter(imMean, weights):
     hubCenter = np.sum(weightedImMean, axis=(0, 1)) / np.sum(weights)
     return hubCenter
 
-def getHubCenterCost(imMean, hubCenter, weights):
-    centeredImMean = imMean - hubCenter
-    np.square(centeredImMean, out = centeredImMean)
-    centeredImMeanNormSquared = np.sum(centeredImMean, axis = 2)
-    del centeredImMean
-    centeredImMeanNormSquared *= weights
-    hubCenterCost = np.sum(centeredImMeanNormSquared) / np.sum(weights)
-    return hubCenterCost
-
 # TODO: Consider weighting the pixels by flattened error when calculating
 # opaqueDiff and transparentDiff
 # TODO: Stop assuming transparentDiff is constant throughout the image
-print "Transparent Min:"
-minDiff = getCutoffDiff(bgDiff, -1)
-transparentMinWeights = getMountainWeights(bgDiff, minDiff)
-transparentMinHubCenter = getHubCenter(imMean, transparentMinWeights)
-print "    Hub Center:", transparentMinHubCenter
-transparentMinCost = getHubCenterCost(imMean, transparentMinHubCenter,
-                                      transparentMinWeights)
-print "    Cost:", transparentMinCost
-del transparentMinWeights
-
-print "Transparent Max:"
-maxDiff = getCutoffDiff(bgDiff, 1)
-transparentMaxWeights = getMountainWeights(bgDiff, maxDiff)
-transparentMaxHubCenter = getHubCenter(imMean, transparentMaxWeights)
-print "    Hub Center:", transparentMaxHubCenter
-transparentMaxCost = getHubCenterCost(imMean, transparentMaxHubCenter,
-                                      transparentMaxWeights)
-print "    Cost:", transparentMaxCost
-del transparentMaxWeights
-
-if transparentMinCost <= transparentMaxCost:
-    print "Choosing min diff to be transparent"
-    transparentDiff = minDiff
-    opaqueDiff = maxDiff
-    hubCenter = transparentMinHubCenter
-else:
-    print "Choosing max diff to be transparent"
-    transparentDiff = maxDiff
-    opaqueDiff = minDiff
-    hubCenter = transparentMaxHubCenter
+bgDiffOrder = np.argsort(np.ravel(bgDiff))
+spotlight = getSpotlight(bgDiff.shape, sigmasInFrame = 3)
+sortedSpotlight = np.ravel(spotlight)[bgDiffOrder]
+del spotlight
+sortedBgDiff = np.ravel(bgDiff)[bgDiffOrder]
+del bgDiffOrder
+# plt.hist(sortedBgDiff, weights = sortedSpotlight, bins = 200, normed = True, rwidth = 1, linewidth = 0)
+transparentDiff = getTransparentDiff(sortedBgDiff, sortedSpotlight)
 print "Transparent Difference:", transparentDiff
+opaqueDiff = getOpaqueDiff(sortedBgDiff, sortedSpotlight)
 print "Opaque Difference:", opaqueDiff
+# plt.show()
+del sortedBgDiff
+
+transparentWeights = getMountainWeights(bgDiff, transparentDiff)
+hubCenter = getHubCenter(imMean, transparentWeights)
+print "Hub Center:", hubCenter
+del transparentWeights
 
 # Calculate transparency values
 

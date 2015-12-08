@@ -2,12 +2,6 @@ Filter radius: 10.9544511501
 Alignment: [4 1]
 Hub Axis: [-0.58002771 -0.62136014 -0.52676316]
 Flat Error: 576.36554365
-Transparent Min:
-    Hub Center: [ 0.30717872  0.25161523  0.30211742]
-    Cost: 0.0122142858388
-Transparent Max:
-    Hub Center: [ 0.42655588  0.40408895  0.40803699]
-    Cost: 0.00502339289924
-Choosing max diff to be transparent
-Transparent Difference: 0.32013944794
-Opaque Difference: -0.392980798649
+Transparent Difference: 0.976662048757
+Opaque Difference: 0.365359832135
+Hub Center: [ 0.41160492  0.38650832  0.3926323 ]
