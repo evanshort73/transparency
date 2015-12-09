@@ -18,10 +18,10 @@ def getTotalArea(*images):
         area += image.shape[0] * image.shape[1]
     return area
 
-# filterRadius = 2 * sigma
-def getFilterSize(filterRadius, sigmasInFrame):
-    filterSize = int(round(filterRadius * sigmasInFrame))
-    return filterSize
+def getFilterLength(filterRadius, sigmasInFrame):
+    idealLength = filterRadius * sigmasInFrame # filterRadius = 2 * sigma
+    oddIntegerLength = 2 * int(round(0.5 * (idealLength + 1))) - 1
+    return oddIntegerLength
 
 def getGaussian(length, sigmasInFrame):
     x = np.linspace(-sigmasInFrame, sigmasInFrame, length, endpoint = True)
@@ -37,24 +37,12 @@ def getSpotlight(shape, sigmasInFrame):
     spotlight = column[:, None] * row
     return spotlight
 
-def getFilterGradient(angle, filterSize):
-    x = np.cos(angle)
-    y = np.sin(angle)
-    row = np.linspace(-x, x, filterSize, endpoint = True)
-    column = np.linspace(y, -y, filterSize, endpoint = True)
-    gradient = column[:, None] + row
-    return gradient
-
-# filter orientations are counterclockwise in the interval [3:00, 9:00)
-def getFilters(filterSize, sigmasInFrame, filterCount):
-    miniSpotlight = getSpotlight((filterSize, filterSize), sigmasInFrame)
-    filters = []
-    for i in xrange(filterCount):
-        angle = np.pi * i / float(filterCount)
-        gradient = getFilterGradient(angle, filterSize)
-        gradient *= miniSpotlight
-        filters.append(gradient)
-    return filters
+def getEdgeFilter(filterSize, sigmasInFrame):
+    assert filterSize % 2 == 1
+    edgeFilter = getGaussian(filterSize, sigmasInFrame)
+    edgeFilter[filterSize // 2:] *= -1
+    edgeFilter[filterSize // 2] = 0
+    return edgeFilter
 
 def getHalfOverhang(fixedShape, movingShape):
     fixedShape = np.asarray(fixedShape[:2])
@@ -72,7 +60,6 @@ def getConvolvedShape(fixedShape, movingShape, overhang):
 
 def convolve(fixed, moving, overhang):
     wrappedShape = tuple(np.asarray(fixed.shape) + np.asarray(overhang))
-    movingReversed = moving[::-1, ::-1]
     wrapped = np.fft.irfft2(
         np.fft.rfft2(fixed, s = wrappedShape) \
         * np.fft.rfft2(moving[::-1, ::-1], s = wrappedShape),
@@ -80,6 +67,22 @@ def convolve(fixed, moving, overhang):
 
     resultShape = getConvolvedShape(fixed.shape, moving.shape, overhang)
     result = wrapped[-resultShape[0]:, -resultShape[1]:]
+    return result
+
+def getConvolvedLength(fixedLength, movingLength, overhang):
+    convolvedLength = fixedLength - movingLength + 1 + 2 * overhang
+    return convolvedLength
+
+def convolve1D(fixed, moving, overhang, axis):
+    wrappedLength = fixed.shape[axis] + overhang
+    moreDimensions = (slice(None),) + (None,) * (len(fixed.shape) - axis - 1)
+    wrapped = np.fft.irfft(
+        np.fft.rfft(fixed, n = wrappedLength, axis = axis) \
+        * np.fft.rfft(moving[::-1], n = wrappedLength)[moreDimensions],
+        n = wrappedLength, axis = axis)
+
+    resultLength = getConvolvedLength(fixed.shape[axis], moving.size, overhang)
+    result = wrapped[(slice(None),) * axis + (slice(-resultLength, None),)]
     return result
 
 def getAlignment(alignmentScores, overhang):
@@ -109,27 +112,23 @@ hubIm2 = np.dot(im2, hubAxis)
 filterRadius = np.sqrt(getTotalArea(im1, im2)) * 0.01
 print "Filter radius:", filterRadius
 
-filters = getFilters(getFilterSize(filterRadius, sigmasInFrame = 3),
-                     sigmasInFrame = 3, filterCount = 2)
+filterLength = getFilterLength(filterRadius, sigmasInFrame = 3)
+edgeFilter = getEdgeFilter(filterLength, sigmasInFrame = 3)
 
-spotlight1 = getSpotlight(
-    getConvolvedShape(hubIm1.shape, filters[0].shape, overhang = (0, 0)),
-    sigmasInFrame = 3)
-spotlight2 = getSpotlight(
-    getConvolvedShape(hubIm2.shape, filters[0].shape, overhang = (0, 0)),
-    sigmasInFrame = 3)
+spotlight1 = getSpotlight(hubIm1.shape, sigmasInFrame = 3)
+spotlight2 = getSpotlight(hubIm2.shape, sigmasInFrame = 3)
 
 overhang = getHalfOverhang(spotlight1.shape, spotlight2.shape)
 
 alignmentScores = np.zeros(getConvolvedShape(
     spotlight1.shape, spotlight2.shape, overhang))
 
-for i in xrange(len(filters)):
-    filteredIm1 = convolve(hubIm1, filters[i], overhang = (0, 0))
+for axis in xrange(2):
+    filteredIm1 = convolve1D(hubIm1, edgeFilter, filterLength // 2, axis)
     np.abs(filteredIm1, out = filteredIm1)
     filteredIm1 *= spotlight1
 
-    filteredIm2 = convolve(hubIm2, filters[i], overhang = (0, 0))
+    filteredIm2 = convolve1D(hubIm2, edgeFilter, filterLength // 2, axis)
     np.abs(filteredIm2, out = filteredIm2)
     filteredIm2 *= spotlight2
 
