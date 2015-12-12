@@ -115,28 +115,26 @@ print "Filter radius:", filterRadius
 filterLength = getFilterLength(filterRadius, sigmasInFrame = 3)
 edgeFilter = getEdgeFilter(filterLength, sigmasInFrame = 3)
 
-spotlight1 = getSpotlight(hubIm1.shape, sigmasInFrame = 3)
-spotlight2 = getSpotlight(hubIm2.shape, sigmasInFrame = 3)
+# Add the filtered images for each axis together so that we only have to
+# perform one 2D convolution. Unfortunately this doesn't make it much faster
+# because filtering, not 2D convolution, is the performance bottleneck for some
+# reason. I will probably switch to OpenCV's Sobel method.
+filteredIm1 = (
+    np.abs(convolve1D(hubIm1, edgeFilter, filterLength // 2, axis = 0)) \
+    + np.abs(convolve1D(hubIm1, edgeFilter, filterLength // 2, axis = 1))) \
+    * getSpotlight(hubIm1.shape, sigmasInFrame = 3)
+del hubIm1
 
-overhang = getHalfOverhang(spotlight1.shape, spotlight2.shape)
+filteredIm2 = (
+    np.abs(convolve1D(hubIm2, edgeFilter, filterLength // 2, axis = 0)) \
+    + np.abs(convolve1D(hubIm2, edgeFilter, filterLength // 2, axis = 1))) \
+    * getSpotlight(hubIm2.shape, sigmasInFrame = 3)
+del hubIm2
 
-alignmentScores = np.zeros(getConvolvedShape(
-    spotlight1.shape, spotlight2.shape, overhang))
+overhang = getHalfOverhang(filteredIm1.shape, filteredIm2.shape)
 
-for axis in xrange(2):
-    filteredIm1 = convolve1D(hubIm1, edgeFilter, filterLength // 2, axis)
-    np.abs(filteredIm1, out = filteredIm1)
-    filteredIm1 *= spotlight1
-
-    filteredIm2 = convolve1D(hubIm2, edgeFilter, filterLength // 2, axis)
-    np.abs(filteredIm2, out = filteredIm2)
-    filteredIm2 *= spotlight2
-
-    alignmentScores += convolve(filteredIm1, filteredIm2, overhang)
-
+alignmentScores = convolve(filteredIm1, filteredIm2, overhang)
 del filteredIm1, filteredIm2
-del spotlight1, spotlight2
-del hubIm1, hubIm2
 
 alignment = getAlignment(alignmentScores, overhang)
 print "Alignment:", alignment
