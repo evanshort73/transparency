@@ -1,5 +1,6 @@
+from __future__ import division, print_function
 import numpy as np
-from scipy.misc import imread, imsave
+from imageio import imread, imsave
 # from matplotlib import pyplot as plt
 
 im1 = imread("in1.png").astype(float) / 255
@@ -110,7 +111,7 @@ hubIm1 = np.dot(im1, hubAxis)
 hubIm2 = np.dot(im2, hubAxis)
 
 filterRadius = np.sqrt(getTotalArea(im1, im2)) * 0.01
-print "Filter radius:", filterRadius
+print("Filter radius:", filterRadius)
 
 filterLength = getFilterLength(filterRadius, sigmasInFrame = 3)
 edgeFilter = getEdgeFilter(filterLength, sigmasInFrame = 3)
@@ -137,7 +138,7 @@ alignmentScores = convolve(filteredIm1, filteredIm2, overhang)
 del filteredIm1, filteredIm2
 
 alignment = getAlignment(alignmentScores, overhang)
-print "Alignment:", alignment
+print("Alignment:", alignment)
 
 alignmentScores -= np.min(alignmentScores)
 alignmentScores *= 255 / np.max(alignmentScores)
@@ -169,10 +170,10 @@ def getFlatError(im1, im2, hubAxis):
     return flatError
 
 hubAxis = getHubAxis(alignedIm1, alignedIm2)
-print "Hub Axis:", hubAxis
+print("Hub Axis:", hubAxis)
 
 flatError = getFlatError(alignedIm1, alignedIm2, hubAxis)
-print "Flat Error:", flatError
+print("Flat Error:", flatError)
 
 # Calculate hub center and cutoff values
 
@@ -240,15 +241,15 @@ sortedBgDiff = np.ravel(bgDiff)[bgDiffOrder]
 del bgDiffOrder
 # plt.hist(sortedBgDiff, weights = sortedSpotlight, bins = 200, normed = True, rwidth = 1, linewidth = 0)
 transparentDiff = getTransparentDiff(sortedBgDiff, sortedSpotlight)
-print "Transparent Difference:", transparentDiff
+print("Transparent Difference:", transparentDiff)
 opaqueDiff = getOpaqueDiff(sortedBgDiff, sortedSpotlight)
-print "Opaque Difference:", opaqueDiff
+print("Opaque Difference:", opaqueDiff)
 # plt.show()
 del sortedBgDiff
 
 transparentWeights = getMountainWeights(bgDiff, transparentDiff)
 hubCenter = getHubCenter(imMean, transparentWeights)
-print "Hub Center:", hubCenter
+print("Hub Center:", hubCenter)
 del transparentWeights
 
 # Calculate transparency values
@@ -311,5 +312,8 @@ def getTransparentImage(trueColors, alpha):
 trueColors = getTrueColors(imMean, hubCenter, alpha)
 transparentImage = getTransparentImage(trueColors, alpha)
 
-imsave("alpha.png", alpha)
-imsave("transparentImage.png", transparentImage)
+def imageToBytes(image):
+    return np.round(image * 255).astype(np.uint8)
+
+imsave("alpha.png", imageToBytes(alpha))
+imsave("transparentImage.png", imageToBytes(transparentImage))
