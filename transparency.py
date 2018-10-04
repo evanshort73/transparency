@@ -3,15 +3,17 @@ import numpy as np
 from imageio import imread, imsave
 # from matplotlib import pyplot as plt
 
+def saveGrayscale(filename, data):
+    image = data - np.min(data)
+    image *= 255 / np.max(image)
+    np.round(image, out = image)
+    np.clip(image, 0, 255, out = image)
+    imsave(filename, image.astype(np.uint8))
+
 im1 = imread("in1.png").astype(float) / 255
 im2 = imread("in2.png").astype(float) / 255
 
 # Align images
-
-def estimateHubAxis(im1, im2):
-    hubAxis = np.mean(im2, axis = (0, 1)) - np.mean(im1, axis = (0, 1))
-    hubAxis /= np.linalg.norm(hubAxis)
-    return hubAxis
 
 def getTotalArea(*images):
     area = 0
@@ -106,9 +108,8 @@ def crop(fixed, moving, alignment):
 
     return croppedFixed, croppedMoving
 
-hubAxis = estimateHubAxis(im1, im2)
-hubIm1 = np.dot(im1, hubAxis)
-hubIm2 = np.dot(im2, hubAxis)
+grayIm1 = np.mean(im1, axis = 2)
+grayIm2 = np.mean(im2, axis = 2)
 
 filterRadius = np.sqrt(getTotalArea(im1, im2)) * 0.01
 print("Filter radius:", filterRadius)
@@ -121,30 +122,28 @@ edgeFilter = getEdgeFilter(filterLength, sigmasInFrame = 3)
 # because filtering, not 2D convolution, is the performance bottleneck for some
 # reason. I will probably switch to OpenCV's Sobel method.
 filteredIm1 = (
-    np.abs(convolve1D(hubIm1, edgeFilter, filterLength // 2, axis = 0)) \
-    + np.abs(convolve1D(hubIm1, edgeFilter, filterLength // 2, axis = 1))) \
-    * getSpotlight(hubIm1.shape, sigmasInFrame = 3)
-del hubIm1
+    np.abs(convolve1D(grayIm1, edgeFilter, filterLength // 2, axis = 0)) \
+    + np.abs(convolve1D(grayIm1, edgeFilter, filterLength // 2, axis = 1))) \
+    * getSpotlight(grayIm1.shape, sigmasInFrame = 3)
+del grayIm1
 
 filteredIm2 = (
-    np.abs(convolve1D(hubIm2, edgeFilter, filterLength // 2, axis = 0)) \
-    + np.abs(convolve1D(hubIm2, edgeFilter, filterLength // 2, axis = 1))) \
-    * getSpotlight(hubIm2.shape, sigmasInFrame = 3)
-del hubIm2
+    np.abs(convolve1D(grayIm2, edgeFilter, filterLength // 2, axis = 0)) \
+    + np.abs(convolve1D(grayIm2, edgeFilter, filterLength // 2, axis = 1))) \
+    * getSpotlight(grayIm2.shape, sigmasInFrame = 3)
+del grayIm2
 
 overhang = getHalfOverhang(filteredIm1.shape, filteredIm2.shape)
 
 alignmentScores = convolve(filteredIm1, filteredIm2, overhang)
+# saveGrayscale("filteredIm1.png", filteredIm1)
+# saveGrayscale("filteredIm2.png", filteredIm2)
 del filteredIm1, filteredIm2
 
 alignment = getAlignment(alignmentScores, overhang)
 print("Alignment:", alignment)
 
-alignmentScores -= np.min(alignmentScores)
-alignmentScores *= 255 / np.max(alignmentScores)
-np.round(alignmentScores, out = alignmentScores)
-np.clip(alignmentScores, 0, 255, out = alignmentScores)
-imsave("alignmentScores.png", alignmentScores.astype(np.uint8))
+saveGrayscale("alignmentScores.png", alignmentScores)
 del alignmentScores
 
 alignedIm1, alignedIm2 = crop(im1, im2, alignment)
@@ -199,7 +198,7 @@ def getMeanOfFirstGaussian(x, weights):
     cost /= np.cumsum(weights)
     endOfNoise = np.argmax(cost)
     bestIndex = endOfNoise + np.argmin(cost[endOfNoise:])
-    # plt.plot(x[endOfNoise + 3000:], cost[endOfNoise + 3000:] * 0.01)
+    # plt.plot(x[1:], 0.2 * np.log(cost[1:]))
     return x[bestIndex]
 
 def getTransparentDiff(sortedBgDiff, weights):
@@ -239,7 +238,7 @@ sortedSpotlight = np.ravel(spotlight)[bgDiffOrder]
 del spotlight
 sortedBgDiff = np.ravel(bgDiff)[bgDiffOrder]
 del bgDiffOrder
-# plt.hist(sortedBgDiff, weights = sortedSpotlight, bins = 200, normed = True, rwidth = 1, linewidth = 0)
+# plt.hist(sortedBgDiff, weights = sortedSpotlight, bins = 200, density = True, rwidth = 1, linewidth = 0)
 transparentDiff = getTransparentDiff(sortedBgDiff, sortedSpotlight)
 print("Transparent Difference:", transparentDiff)
 opaqueDiff = getOpaqueDiff(sortedBgDiff, sortedSpotlight)

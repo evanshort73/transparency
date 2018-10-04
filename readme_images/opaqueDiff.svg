@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="160mm"
+   height="120mm"
+   viewBox="0 0 160 120"
+   version="1.1"
+   id="svg8"
+   inkscape:version="0.92.3 (2405546, 2018-03-11)"
+   sodipodi:docname="opaqueDiff.svg">
+  <defs
+     id="defs2" />
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="1.4"
+     inkscape:cx="154.78055"
+     inkscape:cy="206.64192"
+     inkscape:document-units="mm"
+     inkscape:current-layer="layer1"
+     showgrid="false"
+     inkscape:window-width="1920"
+     inkscape:window-height="1017"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1" />
+  <metadata
+     id="metadata5">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(0,-177)">
+    <rect
+       style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:1;stroke-miterlimit:4;stroke-dasharray:1.99999998, 1.99999998;stroke-dashoffset:0;stroke-opacity:1"
+       id="rect866"
+       width="160"
+       height="120"
+       x="0"
+       y="177" />
+    <circle
+       style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.54979581;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="path817"
+       cx="108.13033"
+       cy="194.04668"
+       r="4.7251019" />
+    <circle
+       style="opacity:1;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.54979581;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="path817-1"
+       cx="32.127983"
+       cy="269.9747"
+       r="4.7251024" />
+    <circle
+       style="opacity:1;fill:#4b257f;fill-opacity:1;stroke:#000000;stroke-width:0.54979581;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="path817-1-1"
+       cx="66.12291"
+       cy="261.87115"
+       r="4.7251029" />
+    <circle
+       style="opacity:1;fill:#cba5ff;fill-opacity:1;stroke:#000000;stroke-width:0.54979581;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="path817-1-1-4-8"
+       cx="100.80895"
+       cy="227.98135"
+       r="4.7251029" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52777791px;line-height:125%;font-family:Arial, Helvetica, 'Helvetica Neue', sans-serif;-inkscape-font-specification:'Arial, Helvetica, Helvetica Neue, sans-serif';letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       x="54.44273"
+       y="271.08017"
+       id="text840"><tspan
+         sodipodi:role="line"
+         x="54.44273"
+         y="271.08017"
+         id="tspan834"
+         style="stroke-width:0.26458332px"><tspan
+           x="54.44273"
+           y="271.08017"
+           id="tspan832"
+           style="stroke-width:0.26458332px">Pixel is dark purple in </tspan></tspan><tspan
+         sodipodi:role="line"
+         x="54.44273"
+         y="275.4899"
+         id="tspan838"
+         style="stroke-width:0.26458332px"><tspan
+           x="54.44273"
+           y="275.4899"
+           id="tspan836"
+           style="stroke-width:0.26458332px">Image 1</tspan></tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52777791px;line-height:125%;font-family:Arial, Helvetica, 'Helvetica Neue', sans-serif;-inkscape-font-specification:'Arial, Helvetica, Helvetica Neue, sans-serif';letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       x="107.92522"
+       y="227.04588"
+       id="text864"><tspan
+         sodipodi:role="line"
+         x="107.92522"
+         y="227.04588"
+         id="tspan858"
+         style="stroke-width:0.26458332px"><tspan
+           x="107.92522"
+           y="227.04588"
+           id="tspan856"
+           style="stroke-width:0.26458332px">Pixel is light purple in </tspan></tspan><tspan
+         sodipodi:role="line"
+         x="107.92522"
+         y="231.4556"
+         id="tspan862"
+         style="stroke-width:0.26458332px"><tspan
+           x="107.92522"
+           y="231.4556"
+           id="tspan860"
+           style="stroke-width:0.26458332px">Image 2</tspan></tspan></text>
+    <path
+       style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       d="m 36.230037,266.07112 65.768173,-64.80456 1.18929,1.75911 1.5119,-5.48065 -5.386157,1.84263 1.924277,1.11436 -65.753279,64.78271 z"
+       id="path4693"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccccccc" />
+    <path
+       style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       d="m 37.828238,268.42591 19.036746,-3.88432 0.08827,2.12157 4.164855,-3.87005 -5.551309,-1.26054 1.052346,1.95889 -19.012599,3.87355 z"
+       id="path4693-8"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccccccc" />
+    <path
+       style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       d="m 106.50267,199.2366 -4.31029,18.94484 -1.96926,-0.7943 1.80857,5.39001 3.43727,-4.53773 -2.21852,0.15105 4.31014,-18.9184 z"
+       id="path4693-8-8"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccccccc" />
+    <path
+       style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       d="m 70.573784,258.56574 23.74004,-23.64505 1.18929,1.75911 1.5119,-5.48065 -5.38616,1.84263 1.92428,1.11436 -23.725146,23.6232 z"
+       id="path4693-2"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccccccc" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52777791px;line-height:125%;font-family:Arial, Helvetica, 'Helvetica Neue', sans-serif;-inkscape-font-specification:'Arial, Helvetica, Helvetica Neue, sans-serif';letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       x="84.761894"
+       y="248.43954"
+       id="text854"><tspan
+         sodipodi:role="line"
+         x="84.761894"
+         y="248.43954"
+         id="tspan844"
+         style="stroke-width:0.26458332px"><tspan
+           x="84.761894"
+           y="248.43954"
+           id="tspan842"
+           style="stroke-width:0.26458332px">Pixel is actually opaque. This vector </tspan></tspan><tspan
+         sodipodi:role="line"
+         x="84.761894"
+         y="252.84926"
+         id="tspan848"
+         style="stroke-width:0.26458332px"><tspan
+           x="84.761894"
+           y="252.84926"
+           id="tspan846"
+           style="stroke-width:0.26458332px">represents a difference in lighting. </tspan></tspan><tspan
+         sodipodi:role="line"
+         x="84.761894"
+         y="257.25897"
+         id="tspan852"
+         style="stroke-width:0.26458332px"><tspan
+           x="84.761894"
+           y="257.25897"
+           id="tspan850"
+           style="stroke-width:0.26458332px">All pixels differ by at least this much.</tspan></tspan></text>
+  </g>
+</svg>
