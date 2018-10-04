@@ -77,6 +77,8 @@ rest with a mirror image
 
 ![Using the algorithm to find the full transparency peak](readme_images/transparentDiffAlgorithm.png)
 
+Here is the result:
+
 ![Cost curves for both peaks](readme_images/costCurvesLabeled.png)
 
 Note: In all of these calculations, the pixels are weighted using a vignette
